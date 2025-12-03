@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Heart } from "lucide-react"
+import { api } from "@/lib/api"
 
 export default function SignupPage() {
   const router = useRouter()
@@ -43,9 +44,24 @@ export default function SignupPage() {
     setIsLoading(true)
 
     try {
+      // Validate required fields (middleName is optional)
+      const requiredFields = [
+        'surname',
+        'firstName',
+        'birthDate',
+        'gender',
+        'civilStatus',
+        'address',
+        'contactNumber',
+        'email',
+        'emergencyContact',
+        'password',
+        'confirmPassword'
+      ]
 
-      for (const key in formData) {
-        if (!formData[key as keyof typeof formData]) {
+      for (const field of requiredFields) {
+        // @ts-ignore
+        if (!formData[field]) {
           setError("Please fill in all required fields.")
           setIsLoading(false)
           return
@@ -77,12 +93,40 @@ export default function SignupPage() {
         return
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      router.push("/dashboard")
+      // Combine firstName, middleName, and surname into full_name
+      const fullName = [
+        formData.firstName.trim(),
+        formData.middleName.trim(),
+        formData.surname.trim()
+      ]
+        .filter(Boolean)
+        .join(' ')
 
-    } catch {
-      setError("An error occurred. Please try again.")
-    } finally {
+      // Map form data to backend API format
+      const registrationData = {
+        full_name: fullName,
+        date_of_birth: formData.birthDate,
+        gender: formData.gender,
+        civil_status: formData.civilStatus,
+        address: formData.address,
+        contact_number: formData.contactNumber,
+        email_address: formData.email,
+        emergency_contact_person_number: formData.emergencyContact,
+        password: formData.password,
+      }
+
+      // Call the registration API
+      await api.register(registrationData)
+
+      // Success - redirect to dashboard
+      router.push("/dashboard")
+    } catch (error) {
+      // Handle API errors
+      if (error instanceof Error) {
+        setError(error.message || "An error occurred. Please try again.")
+      } else {
+        setError("An error occurred. Please try again.")
+      }
       setIsLoading(false)
     }
   }
