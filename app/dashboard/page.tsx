@@ -5,13 +5,24 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Heart, Calendar, Clock, MapPin, LogOut, Settings, Bell, ChevronRight } from "lucide-react"
+import ProtectedRoute from "@/components/protected-route"
+import { getUserData, clearAuth } from "@/lib/auth"
+import { useRouter } from "next/navigation"
 
-export default function DashboardPage() {
+function DashboardContent() {
+  const router = useRouter()
+  const userData = getUserData()
+  
   const [user] = useState({
-    name: "Jerico Bermundo Dadea",
-    email: "Jericodadea26@gmail.com",
-    avatar: "Echo",
+    name: userData?.full_name || "User",
+    email: userData?.email_address || "",
+    avatar: userData?.full_name?.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase() || "U",
   })
+
+  const handleLogout = () => {
+    clearAuth()
+    router.push("/login")
+  }
 
   const upcomingAppointments = [
     {
@@ -67,11 +78,12 @@ export default function DashboardPage() {
                 <p className="text-xs text-muted-foreground">{user.email}</p>
               </div>
             </div>
-            <Link href="/">
-              <button className="p-2 hover:bg-muted rounded-lg transition-colors">
-                <LogOut className="w-5 h-5 text-foreground" />
-              </button>
-            </Link>
+            <button 
+              onClick={handleLogout}
+              className="p-2 hover:bg-muted rounded-lg transition-colors"
+            >
+              <LogOut className="w-5 h-5 text-foreground" />
+            </button>
           </div>
         </div>
       </header>
@@ -218,5 +230,13 @@ export default function DashboardPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <ProtectedRoute>
+      <DashboardContent />
+    </ProtectedRoute>
   )
 }

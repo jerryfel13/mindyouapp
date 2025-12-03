@@ -8,6 +8,8 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Heart } from "lucide-react"
+import { api } from "@/lib/api"
+import { setAuthToken, setUserData } from "@/lib/auth"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -24,19 +26,39 @@ export default function LoginPage() {
     try {
       if (!email || !password) {
         setError("Please fill in all fields")
+        setIsLoading(false)
         return
       }
 
       if (!email.includes("@")) {
         setError("Please enter a valid email")
+        setIsLoading(false)
         return
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      // Call the login API
+      const response = await api.login({
+        email_address: email,
+        password: password,
+      })
+
+      // Store token and user data
+      if (response.token) {
+        setAuthToken(response.token)
+        if (response.data) {
+          setUserData(response.data)
+        }
+      }
+
+      // Success - redirect to dashboard
       router.push("/dashboard")
     } catch (err) {
-      setError("An error occurred. Please try again.")
-    } finally {
+      // Handle API errors
+      if (err instanceof Error) {
+        setError(err.message || "An error occurred. Please try again.")
+      } else {
+        setError("An error occurred. Please try again.")
+      }
       setIsLoading(false)
     }
   }
