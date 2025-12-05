@@ -147,7 +147,12 @@ function DashboardContent() {
                   </div>
 
                   <div className="flex gap-3">
-                    <Button className="flex-1 bg-primary hover:bg-primary/90">Join Session</Button>
+                    <Button 
+                      className="flex-1 bg-primary hover:bg-primary/90"
+                      onClick={() => router.push(`/appointments/video-call?id=${appointment.id}`)}
+                    >
+                      Join Session
+                    </Button>
                     <Button variant="outline" className="flex-1 bg-transparent">
                       Reschedule
                     </Button>
