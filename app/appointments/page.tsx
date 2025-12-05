@@ -6,6 +6,8 @@ import { Card } from "@/components/ui/card"
 import { Heart, Calendar, Clock, MapPin, X, Users, Loader2, CheckCircle } from "lucide-react"
 import { useState, useEffect } from "react"
 import { api } from "@/lib/api"
+import { getUserData } from "@/lib/auth"
+import { useRouter } from "next/navigation"
 
 interface Doctor {
   id: string
@@ -17,9 +19,37 @@ interface Doctor {
   is_verified: boolean
 }
 
+interface Appointment {
+  id: string
+  user_id: string
+  doctor_id: string
+  appointment_date: string
+  appointment_time: string
+  duration_minutes: number
+  appointment_type: string
+  status: string
+  notes?: string
+  session_link?: string
+  meeting_room_id?: string
+  doctor?: {
+    id: string
+    full_name: string
+    specialization: string
+    profile_image_url?: string
+    is_verified: boolean
+  }
+}
+
 export default function AppointmentsPage() {
+  const router = useRouter()
+  const userData = getUserData()
+  const userId = userData?.id || userData?.user_id
+  
   const [availableDoctors, setAvailableDoctors] = useState<Doctor[]>([])
   const [loadingDoctors, setLoadingDoctors] = useState(true)
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [pastAppointments, setPastAppointments] = useState<Appointment[]>([])
+  const [loadingAppointments, setLoadingAppointments] = useState(true)
   
   useEffect(() => {
     const fetchAvailableDoctors = async () => {
@@ -37,64 +67,67 @@ export default function AppointmentsPage() {
     fetchAvailableDoctors()
   }, [])
 
-  const [appointments, setAppointments] = useState([
-    {
-      id: 1,
-      therapist: "Dr. Emily Chen",
-      specialty: "Anxiety & Stress",
-      date: "Today",
-      time: "2:00 PM",
-      duration: "60 min",
-      type: "Video Call",
-      status: "upcoming",
-    },
-    {
-      id: 2,
-      therapist: "Dr. Michael Rodriguez",
-      specialty: "Depression Support",
-      date: "Tomorrow",
-      time: "10:00 AM",
-      duration: "60 min",
-      type: "In-Person",
-      status: "upcoming",
-    },
-    {
-      id: 3,
-      therapist: "Dr. Sarah Williams",
-      specialty: "Relationship Counseling",
-      date: "Dec 15, 2024",
-      time: "3:30 PM",
-      duration: "60 min",
-      type: "Video Call",
-      status: "upcoming",
-    },
-  ])
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      if (!userId) return
+      
+      try {
+        setLoadingAppointments(true)
+        const response = await api.getUserAppointments(userId)
+        const allAppointments = response.data || []
+        
+        const today = new Date().toISOString().split('T')[0]
+        const upcoming = allAppointments.filter((apt: Appointment) => 
+          apt.appointment_date >= today && apt.status !== 'completed' && apt.status !== 'cancelled'
+        )
+        const past = allAppointments.filter((apt: Appointment) => 
+          apt.appointment_date < today || apt.status === 'completed'
+        )
+        
+        setAppointments(upcoming)
+        setPastAppointments(past)
+      } catch (error) {
+        console.error('Error fetching appointments:', error)
+      } finally {
+        setLoadingAppointments(false)
+      }
+    }
 
-  const pastAppointments = [
-    {
-      id: 4,
-      therapist: "Dr. Emily Chen",
-      specialty: "Anxiety & Stress",
-      date: "Dec 8, 2024",
-      time: "2:00 PM",
-      duration: "60 min",
-      type: "Video Call",
-      status: "completed",
-    },
-    {
-      id: 5,
-      therapist: "Dr. Michael Rodriguez",
-      specialty: "Depression Support",
-      date: "Dec 1, 2024",
-      time: "10:00 AM",
-      duration: "60 min",
-      type: "In-Person",
-      status: "completed",
-    },
-  ]
+    fetchAppointments()
+  }, [userId])
 
-  const handleCancel = (id: number) => {
-    setAppointments(appointments.filter((apt) => apt.id !== id))
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const today = new Date()
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    
+    const dateStr = date.toDateString()
+    const todayStr = today.toDateString()
+    const tomorrowStr = tomorrow.toDateString()
+    
+    if (dateStr === todayStr) return "Today"
+    if (dateStr === tomorrowStr) return "Tomorrow"
+    
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  const formatTime = (timeString: string) => {
+    const [hours, minutes] = timeString.split(':')
+    const hour = parseInt(hours)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    const displayHour = hour % 12 || 12
+    return `${displayHour}:${minutes} ${ampm}`
+  }
+
+  const handleCancel = async (id: string) => {
+    try {
+      await api.cancelAppointment(id)
+      setAppointments(appointments.filter((apt) => apt.id !== id))
+    } catch (error) {
+      console.error('Error cancelling appointment:', error)
+      alert('Failed to cancel appointment. Please try again.')
+    }
   }
 
   return (
@@ -132,37 +165,53 @@ export default function AppointmentsPage() {
         {/* Upcoming Appointments */}
         <div className="mb-12">
           <h2 className="text-2xl font-bold text-foreground mb-6">Upcoming Appointments</h2>
-          {appointments.length > 0 ? (
+          {loadingAppointments ? (
+            <Card className="p-12 text-center">
+              <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
+              <p className="text-muted-foreground">Loading appointments...</p>
+            </Card>
+          ) : appointments.length > 0 ? (
             <div className="space-y-4">
               {appointments.map((appointment) => (
                 <Card key={appointment.id} className="p-6 hover:shadow-lg transition-shadow">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-foreground">{appointment.therapist}</h3>
-                      <p className="text-sm text-muted-foreground">{appointment.specialty}</p>
+                      <h3 className="text-lg font-semibold text-foreground">
+                        {appointment.doctor?.full_name || 'Doctor'}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {appointment.doctor?.specialization || 'Specialist'}
+                      </p>
                     </div>
                     <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-medium rounded-full">
-                      {appointment.type}
+                      {appointment.appointment_type || 'Video Call'}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-3 gap-4 mb-6">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Calendar className="w-4 h-4" />
-                      {appointment.date}
+                      {formatDate(appointment.appointment_date)}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Clock className="w-4 h-4" />
-                      {appointment.time}
+                      {formatTime(appointment.appointment_time)}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <MapPin className="w-4 h-4" />
-                      {appointment.duration}
+                      {appointment.duration_minutes || 60} min
                     </div>
                   </div>
 
                   <div className="flex gap-3">
-                    <Button className="flex-1 bg-primary hover:bg-primary/90">Join Session</Button>
+                    {appointment.appointment_type === 'Video Call' && (
+                      <Button 
+                        className="flex-1 bg-primary hover:bg-primary/90"
+                        onClick={() => router.push(`/appointments/video-call?id=${appointment.meeting_room_id || appointment.id}`)}
+                      >
+                        Join Session
+                      </Button>
+                    )}
                     <Button variant="outline" className="flex-1 bg-transparent">
                       Reschedule
                     </Button>
@@ -190,36 +239,47 @@ export default function AppointmentsPage() {
         {/* Past Appointments */}
         <div>
           <h2 className="text-2xl font-bold text-foreground mb-6">Past Appointments</h2>
-          <div className="space-y-4">
-            {pastAppointments.map((appointment) => (
-              <Card key={appointment.id} className="p-6 opacity-75">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-foreground">{appointment.therapist}</h3>
-                    <p className="text-sm text-muted-foreground">{appointment.specialty}</p>
+          {pastAppointments.length > 0 ? (
+            <div className="space-y-4">
+              {pastAppointments.map((appointment) => (
+                <Card key={appointment.id} className="p-6 opacity-75">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-foreground">
+                        {appointment.doctor?.full_name || 'Doctor'}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {appointment.doctor?.specialization || 'Specialist'}
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 bg-muted text-muted-foreground text-xs font-medium rounded-full">
+                      {appointment.status === 'completed' ? 'Completed' : appointment.status}
+                    </span>
                   </div>
-                  <span className="px-3 py-1 bg-muted text-muted-foreground text-xs font-medium rounded-full">
-                    Completed
-                  </span>
-                </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="w-4 h-4" />
-                    {appointment.date}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Calendar className="w-4 h-4" />
+                      {formatDate(appointment.appointment_date)}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="w-4 h-4" />
+                      {formatTime(appointment.appointment_time)}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <MapPin className="w-4 h-4" />
+                      {appointment.duration_minutes || 60} min
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="w-4 h-4" />
-                    {appointment.time}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="w-4 h-4" />
-                    {appointment.duration}
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="p-8 text-center opacity-75">
+              <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No past appointments</p>
+            </Card>
+          )}
         </div>
 
         {/* Available Doctors Section */}

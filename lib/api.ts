@@ -105,5 +105,68 @@ export const api = {
       method: 'GET',
     });
   },
+
+  // Get appointments for a user
+  async getUserAppointments(userId: string, filters?: { status?: string; upcoming?: boolean }) {
+    const queryParams = new URLSearchParams();
+    if (filters?.status) queryParams.append('status', filters.status);
+    if (filters?.upcoming !== undefined) queryParams.append('upcoming', String(filters.upcoming));
+    
+    const queryString = queryParams.toString();
+    const endpoint = `/api/appointments/user/${userId}${queryString ? `?${queryString}` : ''}`;
+    
+    return this.request(endpoint, {
+      method: 'GET',
+    });
+  },
+
+  // Get appointment by ID
+  async getAppointmentById(id: string) {
+    return this.request(`/api/appointments/${id}`, {
+      method: 'GET',
+    });
+  },
+
+  // Create new appointment
+  async createAppointment(appointmentData: {
+    user_id: string;
+    doctor_id: string;
+    appointment_date: string;
+    appointment_time: string;
+    duration_minutes?: number;
+    appointment_type?: string;
+    status?: string;
+    notes?: string;
+    meeting_room_id?: string;
+  }) {
+    return this.request('/api/appointments', {
+      method: 'POST',
+      body: JSON.stringify(appointmentData),
+    });
+  },
+
+  // Update appointment
+  async updateAppointment(id: string, updateData: {
+    appointment_date?: string;
+    appointment_time?: string;
+    duration_minutes?: number;
+    appointment_type?: string;
+    status?: string;
+    notes?: string;
+    session_link?: string;
+    meeting_room_id?: string;
+  }) {
+    return this.request(`/api/appointments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
+    });
+  },
+
+  // Cancel appointment
+  async cancelAppointment(id: string) {
+    return this.request(`/api/appointments/${id}`, {
+      method: 'DELETE',
+    });
+  },
 };
 

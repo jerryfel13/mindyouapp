@@ -20,17 +20,42 @@ interface Doctor {
   is_verified: boolean
 }
 
+interface Appointment {
+  id: string
+  user_id: string
+  doctor_id: string
+  appointment_date: string
+  appointment_time: string
+  duration_minutes: number
+  appointment_type: string
+  status: string
+  notes?: string
+  session_link?: string
+  meeting_room_id?: string
+  doctor?: {
+    id: string
+    full_name: string
+    specialization: string
+    profile_image_url?: string
+    is_verified: boolean
+  }
+}
+
 function DashboardContent() {
   const router = useRouter()
   const userData = getUserData()
   const [availableDoctors, setAvailableDoctors] = useState<Doctor[]>([])
   const [loadingDoctors, setLoadingDoctors] = useState(true)
+  const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([])
+  const [loadingAppointments, setLoadingAppointments] = useState(true)
   
   const [user] = useState({
     name: userData?.full_name || "User",
     email: userData?.email_address || "",
     avatar: userData?.full_name?.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase() || "U",
   })
+
+  const userId = userData?.id || userData?.user_id
 
   useEffect(() => {
     const fetchAvailableDoctors = async () => {
@@ -48,6 +73,24 @@ function DashboardContent() {
     fetchAvailableDoctors()
   }, [])
 
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      if (!userId) return
+      
+      try {
+        setLoadingAppointments(true)
+        const response = await api.getUserAppointments(userId, { upcoming: true })
+        setUpcomingAppointments(response.data || [])
+      } catch (error) {
+        console.error('Error fetching appointments:', error)
+      } finally {
+        setLoadingAppointments(false)
+      }
+    }
+
+    fetchAppointments()
+  }, [userId])
+
   const handleLogout = () => {
     clearAuth()
     router.push("/login")
@@ -62,26 +105,29 @@ function DashboardContent() {
       .toUpperCase()
   }
 
-  const upcomingAppointments = [
-    {
-      id: 1,
-      therapist: "Dr. Emily Chen",
-      specialty: "Anxiety & Stress",
-      date: "Today",
-      time: "2:00 PM",
-      duration: "60 min",
-      type: "Video Call",
-    },
-    {
-      id: 2,
-      therapist: "Dr. Michael Rodriguez",
-      specialty: "Depression Support",
-      date: "Tomorrow",
-      time: "10:00 AM",
-      duration: "60 min",
-      type: "In-Person",
-    },
-  ]
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const today = new Date()
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    
+    const dateStr = date.toDateString()
+    const todayStr = today.toDateString()
+    const tomorrowStr = tomorrow.toDateString()
+    
+    if (dateStr === todayStr) return "Today"
+    if (dateStr === tomorrowStr) return "Tomorrow"
+    
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  const formatTime = (timeString: string) => {
+    const [hours, minutes] = timeString.split(':')
+    const hour = parseInt(hours)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    const displayHour = hour % 12 || 12
+    return `${displayHour}:${minutes} ${ampm}`
+  }
 
   const quickStats = [
     { label: "Total Sessions", value: "12", color: "bg-primary/10" },
@@ -156,48 +202,68 @@ function DashboardContent() {
               </Link>
             </div>
 
-            <div className="space-y-4">
-              {upcomingAppointments.map((appointment) => (
-                <Card key={appointment.id} className="p-6 hover:shadow-lg transition-shadow">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-foreground">{appointment.therapist}</h3>
-                      <p className="text-sm text-muted-foreground">{appointment.specialty}</p>
+            {loadingAppointments ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 text-primary animate-spin" />
+              </div>
+            ) : upcomingAppointments.length > 0 ? (
+              <div className="space-y-4">
+                {upcomingAppointments.map((appointment) => (
+                  <Card key={appointment.id} className="p-6 hover:shadow-lg transition-shadow">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-foreground">
+                          {appointment.doctor?.full_name || 'Doctor'}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {appointment.doctor?.specialization || 'Specialist'}
+                        </p>
+                      </div>
+                      <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-medium rounded-full">
+                        {appointment.appointment_type || 'Video Call'}
+                      </span>
                     </div>
-                    <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-medium rounded-full">
-                      {appointment.type}
-                    </span>
-                  </div>
 
-                  <div className="grid grid-cols-3 gap-4 mb-4">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="w-4 h-4" />
-                      {appointment.date}
+                    <div className="grid grid-cols-3 gap-4 mb-4">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="w-4 h-4" />
+                        {formatDate(appointment.appointment_date)}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="w-4 h-4" />
+                        {formatTime(appointment.appointment_time)}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="w-4 h-4" />
+                        {appointment.duration_minutes || 60} min
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="w-4 h-4" />
-                      {appointment.time}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <MapPin className="w-4 h-4" />
-                      {appointment.duration}
-                    </div>
-                  </div>
 
-                  <div className="flex gap-3">
-                    <Button 
-                      className="flex-1 bg-primary hover:bg-primary/90"
-                      onClick={() => router.push(`/appointments/video-call?id=${appointment.id}`)}
-                    >
-                      Join Session
-                    </Button>
-                    <Button variant="outline" className="flex-1 bg-transparent">
-                      Reschedule
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
+                    <div className="flex gap-3">
+                      {appointment.appointment_type === 'Video Call' && (
+                        <Button 
+                          className="flex-1 bg-primary hover:bg-primary/90"
+                          onClick={() => router.push(`/appointments/video-call?id=${appointment.meeting_room_id || appointment.id}`)}
+                        >
+                          Join Session
+                        </Button>
+                      )}
+                      <Button variant="outline" className="flex-1 bg-transparent">
+                        Reschedule
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card className="p-8 text-center">
+                <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground mb-4">No upcoming appointments</p>
+                <Link href="/appointments/book">
+                  <Button className="bg-primary hover:bg-primary/90">Book Your First Appointment</Button>
+                </Link>
+              </Card>
+            )}
 
             <Link href="/appointments/book">
               <Button className="w-full mt-6 bg-primary hover:bg-primary/90">
