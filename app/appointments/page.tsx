@@ -3,10 +3,40 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Heart, Calendar, Clock, MapPin, X } from "lucide-react"
-import { useState } from "react"
+import { Heart, Calendar, Clock, MapPin, X, Users, Loader2, CheckCircle } from "lucide-react"
+import { useState, useEffect } from "react"
+import { api } from "@/lib/api"
+
+interface Doctor {
+  id: string
+  full_name: string
+  specialization: string
+  bio?: string
+  years_of_experience?: number
+  consultation_fee?: number
+  is_verified: boolean
+}
 
 export default function AppointmentsPage() {
+  const [availableDoctors, setAvailableDoctors] = useState<Doctor[]>([])
+  const [loadingDoctors, setLoadingDoctors] = useState(true)
+  
+  useEffect(() => {
+    const fetchAvailableDoctors = async () => {
+      try {
+        setLoadingDoctors(true)
+        const response = await api.getAvailableDoctors()
+        setAvailableDoctors(response.data || [])
+      } catch (error) {
+        console.error('Error fetching available doctors:', error)
+      } finally {
+        setLoadingDoctors(false)
+      }
+    }
+
+    fetchAvailableDoctors()
+  }, [])
+
   const [appointments, setAppointments] = useState([
     {
       id: 1,
@@ -190,6 +220,79 @@ export default function AppointmentsPage() {
               </Card>
             ))}
           </div>
+        </div>
+
+        {/* Available Doctors Section */}
+        <div className="mt-12">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-foreground mb-2">Available Doctors</h2>
+              <p className="text-muted-foreground">Browse our network of qualified mental health professionals</p>
+            </div>
+            <Link href="/providers">
+              <Button variant="outline" className="bg-transparent">
+                View All
+              </Button>
+            </Link>
+          </div>
+
+          {loadingDoctors ? (
+            <Card className="p-12 text-center">
+              <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
+              <p className="text-muted-foreground">Loading doctors...</p>
+            </Card>
+          ) : availableDoctors.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {availableDoctors.slice(0, 6).map((doctor) => (
+                <Link key={doctor.id} href={`/appointments/book?doctorId=${doctor.id}`}>
+                  <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer h-full">
+                    <div className="flex items-start gap-4 mb-4">
+                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold flex-shrink-0">
+                        {doctor.full_name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-lg font-semibold text-foreground truncate">{doctor.full_name}</h3>
+                          {doctor.is_verified && (
+                            <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate">{doctor.specialization}</p>
+                      </div>
+                    </div>
+                    {doctor.bio && (
+                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{doctor.bio}</p>
+                    )}
+                    <div className="flex items-center justify-between pt-4 border-t border-border">
+                      {doctor.years_of_experience && (
+                        <p className="text-xs text-muted-foreground">
+                          {doctor.years_of_experience} {doctor.years_of_experience === 1 ? 'year' : 'years'} exp.
+                        </p>
+                      )}
+                      {doctor.consultation_fee && (
+                        <p className="text-sm font-semibold text-foreground">
+                          ${doctor.consultation_fee}/session
+                        </p>
+                      )}
+                    </div>
+                    <Button className="w-full mt-4 bg-primary hover:bg-primary/90" size="sm">
+                      Book Appointment
+                    </Button>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <Card className="p-12 text-center">
+              <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground mb-4">No doctors available at the moment</p>
+              <Link href="/providers">
+                <Button variant="outline" className="bg-transparent">
+                  Browse All Doctors
+                </Button>
+              </Link>
+            </Card>
+          )}
         </div>
       </main>
     </div>

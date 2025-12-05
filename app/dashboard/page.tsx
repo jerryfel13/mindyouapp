@@ -1,17 +1,30 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Heart, Calendar, Clock, MapPin, LogOut, Settings, Bell, ChevronRight } from "lucide-react"
+import { Heart, Calendar, Clock, MapPin, LogOut, Settings, Bell, ChevronRight, Users, Loader2 } from "lucide-react"
 import ProtectedRoute from "@/components/protected-route"
 import { getUserData, clearAuth } from "@/lib/auth"
 import { useRouter } from "next/navigation"
+import { api } from "@/lib/api"
+
+interface Doctor {
+  id: string
+  full_name: string
+  specialization: string
+  bio?: string
+  years_of_experience?: number
+  consultation_fee?: number
+  is_verified: boolean
+}
 
 function DashboardContent() {
   const router = useRouter()
   const userData = getUserData()
+  const [availableDoctors, setAvailableDoctors] = useState<Doctor[]>([])
+  const [loadingDoctors, setLoadingDoctors] = useState(true)
   
   const [user] = useState({
     name: userData?.full_name || "User",
@@ -19,9 +32,34 @@ function DashboardContent() {
     avatar: userData?.full_name?.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase() || "U",
   })
 
+  useEffect(() => {
+    const fetchAvailableDoctors = async () => {
+      try {
+        setLoadingDoctors(true)
+        const response = await api.getAvailableDoctors()
+        setAvailableDoctors(response.data || [])
+      } catch (error) {
+        console.error('Error fetching available doctors:', error)
+      } finally {
+        setLoadingDoctors(false)
+      }
+    }
+
+    fetchAvailableDoctors()
+  }, [])
+
   const handleLogout = () => {
     clearAuth()
     router.push("/login")
+  }
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map(n => n[0])
+      .join("")
+      .substring(0, 2)
+      .toUpperCase()
   }
 
   const upcomingAppointments = [
@@ -230,6 +268,65 @@ function DashboardContent() {
                   </div>
                 </div>
               </div>
+            </Card>
+
+            {/* Available Doctors */}
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Available Doctors
+                </h3>
+                <Link href="/providers">
+                  <Button variant="ghost" size="sm">View All</Button>
+                </Link>
+              </div>
+              {loadingDoctors ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                </div>
+              ) : availableDoctors.length > 0 ? (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {availableDoctors.slice(0, 5).map((doctor) => (
+                    <Link key={doctor.id} href={`/providers/${doctor.id}`}>
+                      <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer">
+                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm font-semibold text-primary">
+                            {getInitials(doctor.full_name)}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {doctor.full_name}
+                            </p>
+                            {doctor.is_verified && (
+                              <span className="px-1.5 py-0.5 bg-green-500/20 text-green-500 text-xs rounded-full">
+                                ✓
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {doctor.specialization}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                  {availableDoctors.length > 5 && (
+                    <Link href="/providers">
+                      <Button variant="outline" size="sm" className="w-full bg-transparent">
+                        View {availableDoctors.length - 5} more doctors
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <Users className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No doctors available</p>
+                </div>
+              )}
             </Card>
           </div>
         </div>

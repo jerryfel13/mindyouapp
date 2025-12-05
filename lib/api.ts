@@ -66,5 +66,44 @@ export const api = {
       body: JSON.stringify(credentials),
     });
   },
+
+  // Get all doctors
+  async getDoctors(filters?: {
+    specialization?: string;
+    is_active?: boolean;
+    is_verified?: boolean;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (filters?.specialization) queryParams.append('specialization', filters.specialization);
+    if (filters?.is_active !== undefined) queryParams.append('is_active', String(filters.is_active));
+    if (filters?.is_verified !== undefined) queryParams.append('is_verified', String(filters.is_verified));
+    
+    const queryString = queryParams.toString();
+    const endpoint = `/api/doctors${queryString ? `?${queryString}` : ''}`;
+    
+    return this.request(endpoint, {
+      method: 'GET',
+    });
+  },
+
+  // Get doctor by ID
+  async getDoctorById(id: string) {
+    return this.request(`/api/doctors/${id}`, {
+      method: 'GET',
+    });
+  },
+
+  // Get available doctors (active and verified)
+  async getAvailableDoctors(specialization?: string) {
+    const queryParams = new URLSearchParams();
+    if (specialization) queryParams.append('specialization', specialization);
+    
+    const queryString = queryParams.toString();
+    const endpoint = `/api/doctors/available${queryString ? `?${queryString}` : ''}`;
+    
+    return this.request(endpoint, {
+      method: 'GET',
+    });
+  },
 };
 

@@ -1,17 +1,105 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Heart, Search, Filter, Star, Users, Award } from "lucide-react"
+import { Heart, Search, Filter, Star, Users, Award, Loader2 } from "lucide-react"
+import { api } from "@/lib/api"
+
+interface Doctor {
+  id: string
+  full_name: string
+  email_address: string
+  phone_number?: string
+  specialization: string
+  license_number: string
+  qualifications?: string
+  bio?: string
+  years_of_experience?: number
+  consultation_fee?: number
+  profile_image_url?: string
+  is_active: boolean
+  is_verified: boolean
+  created_at: string
+  updated_at: string
+}
 
 export default function ProvidersPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null)
   const [selectedAvailability, setSelectedAvailability] = useState<string | null>(null)
+  const [doctors, setDoctors] = useState<Doctor[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const providers = [
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const response = await api.getDoctors({ is_active: true })
+        setDoctors(response.data || [])
+      } catch (err) {
+        console.error('Error fetching doctors:', err)
+        setError(err instanceof Error ? err.message : 'Failed to load doctors')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDoctors()
+  }, [])
+
+  // Get unique specialties from doctors
+  const specialties = Array.from(new Set(doctors.map(d => d.specialization).filter(Boolean)))
+
+  const filteredProviders = doctors.filter((doctor) => {
+    const matchesSearch =
+      doctor.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doctor.specialization.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (doctor.bio && doctor.bio.toLowerCase().includes(searchQuery.toLowerCase()))
+    const matchesSpecialty = !selectedSpecialty || doctor.specialization === selectedSpecialty
+    return matchesSearch && matchesSpecialty
+  })
+
+  // Helper function to get initials
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map(n => n[0])
+      .join("")
+      .substring(0, 2)
+      .toUpperCase()
+  }
+
+  // Helper function to format experience
+  const formatExperience = (years?: number) => {
+    if (!years) return "Experience not specified"
+    return `${years} ${years === 1 ? 'year' : 'years'} experience`
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
+          <p className="text-foreground">Loading doctors...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center">
+        <Card className="p-8 text-center max-w-md">
+          <p className="text-red-500 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </Card>
+      </div>
+    )
+  }
     {
       id: "emily-chen",
       name: "Dr. Emily Chen",
@@ -92,17 +180,6 @@ export default function ProvidersPage() {
     },
   ]
 
-  const specialties = ["Anxiety & Stress", "Depression Support", "Relationship Counseling", "Trauma & PTSD"]
-  const availabilityOptions = ["Available Today", "Available Tomorrow", "Available in 2 days", "Available in 3 days"]
-
-  const filteredProviders = providers.filter((provider) => {
-    const matchesSearch =
-      provider.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      provider.specialty.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesSpecialty = !selectedSpecialty || provider.specialty === selectedSpecialty
-    const matchesAvailability = !selectedAvailability || provider.availability === selectedAvailability
-    return matchesSearch && matchesSpecialty && matchesAvailability
-  })
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted">
@@ -181,35 +258,6 @@ export default function ProvidersPage() {
                 </div>
               </div>
 
-              {/* Availability Filter */}
-              <div>
-                <h4 className="text-sm font-semibold text-foreground mb-3">Availability</h4>
-                <div className="space-y-2">
-                  <button
-                    onClick={() => setSelectedAvailability(null)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                      !selectedAvailability
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    All Times
-                  </button>
-                  {availabilityOptions.map((option) => (
-                    <button
-                      key={option}
-                      onClick={() => setSelectedAvailability(option)}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                        selectedAvailability === option
-                          ? "bg-primary/10 text-primary font-medium"
-                          : "text-muted-foreground hover:bg-muted"
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </Card>
           </div>
 
@@ -217,52 +265,65 @@ export default function ProvidersPage() {
           <div className="lg:col-span-3">
             {filteredProviders.length > 0 ? (
               <div className="grid md:grid-cols-2 gap-6">
-                {filteredProviders.map((provider) => (
-                  <Link key={provider.id} href={`/providers/${provider.id}`}>
+                {filteredProviders.map((doctor) => (
+                  <Link key={doctor.id} href={`/providers/${doctor.id}`}>
                     <Card className="p-6 h-full hover:shadow-lg transition-shadow cursor-pointer">
                       <div className="flex items-start gap-4 mb-4">
                         <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold flex-shrink-0">
-                          {provider.image}
+                          {doctor.profile_image_url ? (
+                            <img 
+                              src={doctor.profile_image_url} 
+                              alt={doctor.full_name}
+                              className="w-full h-full rounded-full object-cover"
+                            />
+                          ) : (
+                            getInitials(doctor.full_name)
+                          )}
                         </div>
                         <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-foreground">{provider.name}</h3>
-                          <p className="text-sm text-muted-foreground">{provider.specialty}</p>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-semibold text-foreground">{doctor.full_name}</h3>
+                            {doctor.is_verified && (
+                              <span className="px-2 py-0.5 bg-green-500/20 text-green-500 text-xs rounded-full font-medium">
+                                Verified
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">{doctor.specialization}</p>
                         </div>
                       </div>
 
-                      <p className="text-sm text-muted-foreground mb-4">{provider.bio}</p>
+                      {doctor.bio && (
+                        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{doctor.bio}</p>
+                      )}
 
                       <div className="flex items-center gap-4 mb-4 pb-4 border-b border-border">
-                        <div className="flex items-center gap-1">
-                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                          <span className="text-sm font-semibold text-foreground">{provider.rating}</span>
-                          <span className="text-xs text-muted-foreground">({provider.reviews})</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Users className="w-4 h-4" />
-                          {provider.patients} patients
-                        </div>
+                        {doctor.years_of_experience && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Award className="w-4 h-4 text-primary" />
+                            {formatExperience(doctor.years_of_experience)}
+                          </div>
+                        )}
+                        {doctor.consultation_fee && (
+                          <div className="text-xs text-muted-foreground">
+                            ${doctor.consultation_fee} per session
+                          </div>
+                        )}
                       </div>
 
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Award className="w-4 h-4 text-primary" />
-                          <span className="text-muted-foreground">{provider.experience} experience</span>
+                      {doctor.qualifications && (
+                        <div className="mb-4">
+                          <p className="text-xs text-muted-foreground mb-2">Qualifications:</p>
+                          <p className="text-xs text-foreground line-clamp-2">{doctor.qualifications}</p>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          {provider.languages.map((lang) => (
-                            <span
-                              key={lang}
-                              className="px-2 py-1 bg-secondary/20 text-secondary-foreground text-xs rounded"
-                            >
-                              {lang}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
+                      )}
 
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-accent">{provider.availability}</span>
+                        <span className={`text-xs font-medium ${
+                          doctor.is_active ? 'text-green-500' : 'text-red-500'
+                        }`}>
+                          {doctor.is_active ? 'Available' : 'Not Available'}
+                        </span>
                         <Button size="sm" className="bg-primary hover:bg-primary/90">
                           View Profile
                         </Button>
@@ -274,13 +335,12 @@ export default function ProvidersPage() {
             ) : (
               <Card className="p-12 text-center">
                 <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">No providers found matching your criteria</p>
+                <p className="text-muted-foreground mb-4">No doctors found matching your criteria</p>
                 <Button
                   variant="outline"
                   onClick={() => {
                     setSearchQuery("")
                     setSelectedSpecialty(null)
-                    setSelectedAvailability(null)
                   }}
                   className="bg-transparent"
                 >

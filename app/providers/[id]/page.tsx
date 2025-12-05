@@ -1,108 +1,87 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Heart, Star, Users, Award, Globe, Clock, CheckCircle, MessageSquare } from "lucide-react"
+import { Heart, Award, Loader2, CheckCircle, MessageSquare, Globe, Clock } from "lucide-react"
+import { api } from "@/lib/api"
 
-const providers: Record<
-  string,
-  {
-    name: string
-    specialty: string
-    bio: string
-    fullBio: string
-    rating: number
-    reviews: number
-    patients: number
-    availability: string
-    experience: string
-    languages: string[]
-    image: string
-    education: string[]
-    certifications: string[]
-    approach: string
-    sessionPrice: number
-    sessionDuration: number
-    testimonials: Array<{ author: string; text: string; rating: number }>
-  }
-> = {
-  "emily-chen": {
-    name: "Dr. Emily Chen",
-    specialty: "Anxiety & Stress",
-    bio: "Specializing in cognitive behavioral therapy for anxiety disorders",
-    fullBio:
-      "Dr. Emily Chen is a licensed clinical psychologist with over 12 years of experience treating anxiety disorders and stress-related conditions. She specializes in cognitive behavioral therapy (CBT) and has helped hundreds of patients overcome anxiety and build resilience.",
-    rating: 4.9,
-    reviews: 128,
-    patients: 450,
-    availability: "Available Today",
-    experience: "12 years",
-    languages: ["English", "Mandarin"],
-    image: "EC",
-    education: ["Ph.D. in Clinical Psychology - Stanford University", "M.A. in Psychology - UC Berkeley"],
-    certifications: ["Licensed Clinical Psychologist", "CBT Specialist", "Anxiety Disorders Specialist"],
-    approach:
-      "I use evidence-based cognitive behavioral therapy combined with mindfulness techniques to help clients manage anxiety and stress. My approach is collaborative and tailored to each individual's needs.",
-    sessionPrice: 120,
-    sessionDuration: 60,
-    testimonials: [
-      {
-        author: "Jessica M.",
-        text: "Dr. Chen helped me overcome my anxiety in just a few months. Her approach is practical and compassionate.",
-        rating: 5,
-      },
-      {
-        author: "Michael T.",
-        text: "The best therapist I've worked with. She really understands anxiety and provides actionable strategies.",
-        rating: 5,
-      },
-    ],
-  },
-  "michael-rodriguez": {
-    name: "Dr. Michael Rodriguez",
-    specialty: "Depression Support",
-    bio: "Expert in treating depression and mood disorders",
-    fullBio:
-      "Dr. Michael Rodriguez is a board-certified psychiatrist and psychotherapist specializing in depression and mood disorders. With 10 years of clinical experience, he has developed a holistic approach to mental health treatment.",
-    rating: 4.8,
-    reviews: 95,
-    patients: 380,
-    availability: "Available Tomorrow",
-    experience: "10 years",
-    languages: ["English", "Spanish"],
-    image: "MR",
-    education: ["M.D. in Psychiatry - Johns Hopkins University", "B.S. in Biology - University of Texas"],
-    certifications: ["Board-Certified Psychiatrist", "Depression Specialist", "Psychotherapist"],
-    approach:
-      "I combine medication management with psychotherapy to provide comprehensive depression treatment. My goal is to help clients regain joy and purpose in their lives.",
-    sessionPrice: 150,
-    sessionDuration: 60,
-    testimonials: [
-      {
-        author: "Sarah K.",
-        text: "Dr. Rodriguez's treatment plan changed my life. I finally feel like myself again.",
-        rating: 5,
-      },
-      {
-        author: "David L.",
-        text: "Professional, caring, and effective. Highly recommended for anyone struggling with depression.",
-        rating: 5,
-      },
-    ],
-  },
+interface Doctor {
+  id: string
+  full_name: string
+  email_address: string
+  phone_number?: string
+  specialization: string
+  license_number: string
+  qualifications?: string
+  bio?: string
+  years_of_experience?: number
+  consultation_fee?: number
+  profile_image_url?: string
+  is_active: boolean
+  is_verified: boolean
+  created_at: string
+  updated_at: string
 }
 
 export default function ProviderDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const provider = providers[params.id]
+  const [doctor, setDoctor] = useState<Doctor | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  if (!provider) {
+  useEffect(() => {
+    const fetchDoctor = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const response = await api.getDoctorById(params.id)
+        setDoctor(response.data)
+      } catch (err) {
+        console.error('Error fetching doctor:', err)
+        setError(err instanceof Error ? err.message : 'Failed to load doctor')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (params.id) {
+      fetchDoctor()
+    }
+  }, [params.id])
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map(n => n[0])
+      .join("")
+      .substring(0, 2)
+      .toUpperCase()
+  }
+
+  const formatExperience = (years?: number) => {
+    if (!years) return "Experience not specified"
+    return `${years} ${years === 1 ? 'year' : 'years'} experience`
+  }
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center">
-        <Card className="p-8 text-center">
-          <p className="text-muted-foreground mb-4">Provider not found</p>
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
+          <p className="text-foreground">Loading doctor profile...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !doctor) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center">
+        <Card className="p-8 text-center max-w-md">
+          <p className="text-red-500 mb-4">{error || 'Doctor not found'}</p>
           <Link href="/providers">
             <Button className="bg-primary hover:bg-primary/90">Back to Directory</Button>
           </Link>
@@ -130,89 +109,89 @@ export default function ProviderDetailPage({ params }: { params: { id: string } 
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Provider Header */}
+        {/* Doctor Header */}
         <div className="flex items-start gap-6 mb-8">
           <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-3xl font-semibold flex-shrink-0">
-            {provider.image}
+            {doctor.profile_image_url ? (
+              <img 
+                src={doctor.profile_image_url} 
+                alt={doctor.full_name}
+                className="w-full h-full rounded-full object-cover"
+              />
+            ) : (
+              getInitials(doctor.full_name)
+            )}
           </div>
           <div className="flex-1">
-            <h1 className="text-4xl font-bold text-foreground mb-2">{provider.name}</h1>
-            <p className="text-xl text-muted-foreground mb-4">{provider.specialty}</p>
+            <div className="flex items-center gap-2 mb-2">
+              <h1 className="text-4xl font-bold text-foreground">{doctor.full_name}</h1>
+              {doctor.is_verified && (
+                <span className="px-3 py-1 bg-green-500/20 text-green-500 text-sm rounded-full font-medium">
+                  Verified
+                </span>
+              )}
+            </div>
+            <p className="text-xl text-muted-foreground mb-4">{doctor.specialization}</p>
             <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-                <span className="font-semibold text-foreground">{provider.rating}</span>
-                <span className="text-muted-foreground">({provider.reviews} reviews)</span>
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Users className="w-5 h-5" />
-                {provider.patients} patients
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Award className="w-5 h-5" />
-                {provider.experience} experience
+              {doctor.years_of_experience && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Award className="w-5 h-5" />
+                  {formatExperience(doctor.years_of_experience)}
+                </div>
+              )}
+              <div className={`flex items-center gap-2 ${doctor.is_active ? 'text-green-500' : 'text-red-500'}`}>
+                <Clock className="w-5 h-5" />
+                {doctor.is_active ? 'Available' : 'Not Available'}
               </div>
             </div>
           </div>
-          <Button onClick={() => router.push("/appointments/book")} className="bg-primary hover:bg-primary/90">
+          <Button 
+            onClick={() => router.push(`/appointments/book?doctorId=${doctor.id}`)} 
+            className="bg-primary hover:bg-primary/90"
+            disabled={!doctor.is_active}
+          >
             Book Appointment
           </Button>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
-            <Card className="p-6">
-              <h2 className="text-2xl font-bold text-foreground mb-4">About</h2>
-              <p className="text-muted-foreground leading-relaxed">{provider.fullBio}</p>
-            </Card>
+            {doctor.bio && (
+              <Card className="p-6">
+                <h2 className="text-2xl font-bold text-foreground mb-4">About</h2>
+                <p className="text-muted-foreground leading-relaxed">{doctor.bio}</p>
+              </Card>
+            )}
 
-            <Card className="p-6">
-              <h2 className="text-2xl font-bold text-foreground mb-4">My Approach</h2>
-              <p className="text-muted-foreground leading-relaxed">{provider.approach}</p>
-            </Card>
-
-            <Card className="p-6">
-              <h2 className="text-2xl font-bold text-foreground mb-6">Education & Certifications</h2>
-              <div className="space-y-6">
-                <div>
-                  <h3 className="font-semibold text-foreground mb-3">Education</h3>
-                  <ul className="space-y-2">
-                    {provider.education.map((edu, idx) => (
-                      <li key={idx} className="flex gap-3 text-muted-foreground">
+            {doctor.qualifications && (
+              <Card className="p-6">
+                <h2 className="text-2xl font-bold text-foreground mb-6">Qualifications</h2>
+                <div className="space-y-3">
+                  {doctor.qualifications.split('\n').map((qual, idx) => (
+                    qual.trim() && (
+                      <div key={idx} className="flex gap-3 text-muted-foreground">
                         <CheckCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                        {edu}
-                      </li>
-                    ))}
-                  </ul>
+                        <span>{qual.trim()}</span>
+                      </div>
+                    )
+                  ))}
                 </div>
-                <div>
-                  <h3 className="font-semibold text-foreground mb-3">Certifications</h3>
-                  <ul className="space-y-2">
-                    {provider.certifications.map((cert, idx) => (
-                      <li key={idx} className="flex gap-3 text-muted-foreground">
-                        <CheckCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                        {cert}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </Card>
+              </Card>
+            )}
 
             <Card className="p-6">
-              <h2 className="text-2xl font-bold text-foreground mb-6">Client Testimonials</h2>
-              <div className="space-y-6">
-                {provider.testimonials.map((testimonial, idx) => (
-                  <div key={idx} className="pb-6 border-b border-border last:border-0 last:pb-0">
-                    <div className="flex items-center gap-1 mb-2">
-                      {[...Array(testimonial.rating)].map((_, i) => (
-                        <Star key={i} className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                      ))}
-                    </div>
-                    <p className="text-muted-foreground mb-2">{testimonial.text}</p>
-                    <p className="text-sm font-semibold text-foreground">— {testimonial.author}</p>
+              <h2 className="text-2xl font-bold text-foreground mb-4">License Information</h2>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-sm text-muted-foreground">License Number</p>
+                  <p className="text-foreground font-medium">{doctor.license_number}</p>
+                </div>
+                {doctor.is_verified && (
+                  <div className="flex items-center gap-2 text-green-500">
+                    <CheckCircle className="w-5 h-5" />
+                    <span className="text-sm">Verified License</span>
                   </div>
-                ))}
+                )}
               </div>
             </Card>
           </div>
@@ -221,58 +200,55 @@ export default function ProviderDetailPage({ params }: { params: { id: string } 
             <Card className="p-6">
               <h3 className="text-lg font-semibold text-foreground mb-4">Quick Info</h3>
               <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Session Price</p>
-                  <p className="text-2xl font-bold text-foreground">${provider.sessionPrice}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Session Duration</p>
-                  <p className="text-lg font-semibold text-foreground">{provider.sessionDuration} minutes</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">Languages</p>
-                  <div className="flex flex-wrap gap-2">
-                    {provider.languages.map((lang) => (
-                      <span
-                        key={lang}
-                        className="px-3 py-1 bg-secondary/20 text-secondary-foreground text-xs rounded-full"
-                      >
-                        {lang}
-                      </span>
-                    ))}
+                {doctor.consultation_fee && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Consultation Fee</p>
+                    <p className="text-2xl font-bold text-foreground">${doctor.consultation_fee}</p>
                   </div>
+                )}
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Specialization</p>
+                  <p className="text-lg font-semibold text-foreground">{doctor.specialization}</p>
                 </div>
-                <div className="flex items-center gap-2 text-accent font-medium">
+                {doctor.phone_number && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Contact</p>
+                    <p className="text-foreground">{doctor.phone_number}</p>
+                  </div>
+                )}
+                <div className={`flex items-center gap-2 ${doctor.is_active ? 'text-green-500' : 'text-red-500'} font-medium`}>
                   <Clock className="w-4 h-4" />
-                  {provider.availability}
+                  {doctor.is_active ? 'Available for appointments' : 'Currently not accepting new patients'}
                 </div>
               </div>
             </Card>
 
             <Card className="p-6">
               <h3 className="text-lg font-semibold text-foreground mb-4">Get in Touch</h3>
-              <Button className="w-full bg-primary hover:bg-primary/90 mb-3">
-                <MessageSquare className="w-4 h-4 mr-2" />
-                Send Message
-              </Button>
-              <Button variant="outline" className="w-full bg-transparent">
-                <Globe className="w-4 h-4 mr-2" />
-                Visit Website
-              </Button>
-            </Card>
-
-            <Card className="p-6 bg-primary/5 border-primary/20">
-              <h3 className="text-lg font-semibold text-foreground mb-3">Ready to Book?</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Schedule your first session with {provider.name.split(" ")[1]} today.
-              </p>
-              <Button
-                onClick={() => router.push("/appointments/book")}
-                className="w-full bg-primary hover:bg-primary/90"
+              <Button 
+                className="w-full bg-primary hover:bg-primary/90 mb-3"
+                onClick={() => router.push(`/appointments/book?doctorId=${doctor.id}`)}
+                disabled={!doctor.is_active}
               >
+                <MessageSquare className="w-4 h-4 mr-2" />
                 Book Appointment
               </Button>
             </Card>
+
+            {doctor.is_active && (
+              <Card className="p-6 bg-primary/5 border-primary/20">
+                <h3 className="text-lg font-semibold text-foreground mb-3">Ready to Book?</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Schedule your first session with {doctor.full_name.split(" ")[1] || doctor.full_name} today.
+                </p>
+                <Button
+                  onClick={() => router.push(`/appointments/book?doctorId=${doctor.id}`)}
+                  className="w-full bg-primary hover:bg-primary/90"
+                >
+                  Book Appointment
+                </Button>
+              </Card>
+            )}
           </div>
         </div>
       </main>

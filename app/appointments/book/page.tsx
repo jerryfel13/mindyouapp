@@ -1,54 +1,56 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Heart, Calendar, Clock, ChevronLeft, ChevronRight } from "lucide-react"
+import { Heart, Calendar, Clock, ChevronLeft, ChevronRight, Loader2, CheckCircle } from "lucide-react"
+import { api } from "@/lib/api"
+
+interface Doctor {
+  id: string
+  full_name: string
+  specialization: string
+  bio?: string
+  years_of_experience?: number
+  consultation_fee?: number
+  is_verified: boolean
+}
 
 export default function BookAppointmentPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const doctorIdFromUrl = searchParams.get("doctorId")
+  
   const [step, setStep] = useState(1)
-  const [selectedTherapist, setSelectedTherapist] = useState<string | null>(null)
+  const [selectedTherapist, setSelectedTherapist] = useState<string | null>(doctorIdFromUrl)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
   const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [doctors, setDoctors] = useState<Doctor[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const therapists = [
-    {
-      id: "emily",
-      name: "Dr. Emily Chen",
-      specialty: "Anxiety & Stress",
-      rating: 4.9,
-      reviews: 128,
-      availability: "Available Today",
-    },
-    {
-      id: "michael",
-      name: "Dr. Michael Rodriguez",
-      specialty: "Depression Support",
-      rating: 4.8,
-      reviews: 95,
-      availability: "Available Tomorrow",
-    },
-    {
-      id: "sarah",
-      name: "Dr. Sarah Williams",
-      specialty: "Relationship Counseling",
-      rating: 4.9,
-      reviews: 112,
-      availability: "Available in 2 days",
-    },
-    {
-      id: "james",
-      name: "Dr. James Patterson",
-      specialty: "Trauma & PTSD",
-      rating: 4.7,
-      reviews: 87,
-      availability: "Available in 3 days",
-    },
-  ]
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        setLoading(true)
+        const response = await api.getAvailableDoctors()
+        setDoctors(response.data || [])
+        
+        // If doctorId is in URL, ensure it's selected
+        if (doctorIdFromUrl && !selectedTherapist) {
+          setSelectedTherapist(doctorIdFromUrl)
+        }
+      } catch (error) {
+        console.error('Error fetching doctors:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDoctors()
+  }, [doctorIdFromUrl])
 
   const timeSlots = ["9:00 AM", "10:00 AM", "11:00 AM", "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM"]
 
@@ -141,30 +143,62 @@ export default function BookAppointmentPage() {
 
         {step === 1 && (
           <div className="space-y-4 mb-8">
-            {therapists.map((therapist) => (
-              <Card
-                key={therapist.id}
-                onClick={() => setSelectedTherapist(therapist.id)}
-                className={`p-6 cursor-pointer transition-all ${
-                  selectedTherapist === therapist.id ? "ring-2 ring-primary bg-primary/5" : "hover:shadow-lg"
-                }`}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="text-lg font-semibold text-foreground">{therapist.name}</h3>
-                    <p className="text-sm text-muted-foreground">{therapist.specialty}</p>
-                  </div>
-                  <div className="text-right">
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm font-semibold text-foreground">{therapist.rating}</span>
-                      <span className="text-yellow-500">★</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{therapist.reviews} reviews</p>
-                  </div>
-                </div>
-                <p className="text-sm text-accent font-medium">{therapist.availability}</p>
+            {loading ? (
+              <Card className="p-12 text-center">
+                <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
+                <p className="text-muted-foreground">Loading available doctors...</p>
               </Card>
-            ))}
+            ) : doctors.length > 0 ? (
+              doctors.map((doctor) => (
+                <Card
+                  key={doctor.id}
+                  onClick={() => setSelectedTherapist(doctor.id)}
+                  className={`p-6 cursor-pointer transition-all ${
+                    selectedTherapist === doctor.id ? "ring-2 ring-primary bg-primary/5" : "hover:shadow-lg"
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-lg font-semibold text-foreground">{doctor.full_name}</h3>
+                        {doctor.is_verified && (
+                          <span className="px-2 py-0.5 bg-green-500/20 text-green-500 text-xs rounded-full font-medium flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3" />
+                            Verified
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{doctor.specialization}</p>
+                      {doctor.bio && (
+                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{doctor.bio}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
+                    {doctor.years_of_experience && (
+                      <p className="text-xs text-muted-foreground">
+                        {doctor.years_of_experience} {doctor.years_of_experience === 1 ? 'year' : 'years'} experience
+                      </p>
+                    )}
+                    {doctor.consultation_fee && (
+                      <p className="text-sm font-semibold text-foreground">
+                        ${doctor.consultation_fee} per session
+                      </p>
+                    )}
+                  </div>
+                </Card>
+              ))
+            ) : (
+              <Card className="p-12 text-center">
+                <Heart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground mb-4">No doctors available at the moment</p>
+                <Link href="/providers">
+                  <Button variant="outline" className="bg-transparent">
+                    Browse All Doctors
+                  </Button>
+                </Link>
+              </Card>
+            )}
           </div>
         )}
 
@@ -242,8 +276,13 @@ export default function BookAppointmentPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Therapist</p>
                   <p className="font-semibold text-foreground">
-                    {therapists.find((t) => t.id === selectedTherapist)?.name}
+                    {doctors.find((d) => d.id === selectedTherapist)?.full_name || 'Not selected'}
                   </p>
+                  {doctors.find((d) => d.id === selectedTherapist)?.specialization && (
+                    <p className="text-xs text-muted-foreground">
+                      {doctors.find((d) => d.id === selectedTherapist)?.specialization}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-3 pb-4 border-b border-border">
