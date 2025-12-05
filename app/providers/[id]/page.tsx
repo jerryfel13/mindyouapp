@@ -160,21 +160,17 @@ export default function ProviderDetailPage({ params }: { params: { id: string } 
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
-            {/* About */}
             <Card className="p-6">
               <h2 className="text-2xl font-bold text-foreground mb-4">About</h2>
               <p className="text-muted-foreground leading-relaxed">{provider.fullBio}</p>
             </Card>
 
-            {/* Approach */}
             <Card className="p-6">
               <h2 className="text-2xl font-bold text-foreground mb-4">My Approach</h2>
               <p className="text-muted-foreground leading-relaxed">{provider.approach}</p>
             </Card>
 
-            {/* Education & Certifications */}
             <Card className="p-6">
               <h2 className="text-2xl font-bold text-foreground mb-6">Education & Certifications</h2>
               <div className="space-y-6">
@@ -203,7 +199,6 @@ export default function ProviderDetailPage({ params }: { params: { id: string } 
               </div>
             </Card>
 
-            {/* Testimonials */}
             <Card className="p-6">
               <h2 className="text-2xl font-bold text-foreground mb-6">Client Testimonials</h2>
               <div className="space-y-6">
@@ -222,9 +217,7 @@ export default function ProviderDetailPage({ params }: { params: { id: string } 
             </Card>
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
-            {/* Quick Info */}
             <Card className="p-6">
               <h3 className="text-lg font-semibold text-foreground mb-4">Quick Info</h3>
               <div className="space-y-4">
@@ -256,7 +249,6 @@ export default function ProviderDetailPage({ params }: { params: { id: string } 
               </div>
             </Card>
 
-            {/* Contact */}
             <Card className="p-6">
               <h3 className="text-lg font-semibold text-foreground mb-4">Get in Touch</h3>
               <Button className="w-full bg-primary hover:bg-primary/90 mb-3">
@@ -269,7 +261,6 @@ export default function ProviderDetailPage({ params }: { params: { id: string } 
               </Button>
             </Card>
 
-            {/* Book Now */}
             <Card className="p-6 bg-primary/5 border-primary/20">
               <h3 className="text-lg font-semibold text-foreground mb-3">Ready to Book?</h3>
               <p className="text-sm text-muted-foreground mb-4">

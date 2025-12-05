@@ -58,13 +58,11 @@ export default function ConsultationPage({ params }: { params: { id: string } })
   }
 
   const handleEndSession = () => {
-    // In a real app, this would end the video call and redirect
     window.location.href = "/dashboard"
   }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
       <header className="border-b border-border bg-background/80 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2">
