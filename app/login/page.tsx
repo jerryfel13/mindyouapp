@@ -47,16 +47,23 @@ export default function LoginPage() {
         setAuthToken(response.token)
         if (response.data) {
           setUserData(response.data)
+          console.log('Login - User data stored:', response.data)
+          console.log('Login - User role:', response.data.role)
         }
       }
 
       // Success - redirect based on user role
       const userRole = response.data?.role || 'user'
+      console.log('Login - Redirecting based on role:', userRole)
+      
       if (userRole === 'admin') {
+        console.log('Login - Redirecting to /doctor (admin)')
         router.push("/doctor")
       } else if (userRole === 'doctor') {
+        console.log('Login - Redirecting to /doctor-dashboard (doctor)')
         router.push("/doctor-dashboard")
       } else {
+        console.log('Login - Redirecting to /dashboard (user)')
         router.push("/dashboard")
       }
     } catch (err) {
