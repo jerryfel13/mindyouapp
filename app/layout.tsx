@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: '',
   generator: '',
 }
-
+ 
 export default function RootLayout({
   children,
 }: Readonly<{
