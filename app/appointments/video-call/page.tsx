@@ -65,6 +65,11 @@ function VideoCallContent() {
   const userRole = userData?.role || 'user'
   const isDoctor = userRole === 'doctor' || userRole === 'admin'
 
+  // Debug: Log state changes
+  useEffect(() => {
+    console.log('🔄 State update - callStarted:', callStarted, 'waitingForDoctor:', waitingForDoctor, 'isDoctor:', isDoctor)
+  }, [callStarted, waitingForDoctor, isDoctor])
+
   // Initialize Socket.io connection
   useEffect(() => {
     const socket = io(API_BASE_URL, {
@@ -73,9 +78,120 @@ function VideoCallContent() {
 
     socketRef.current = socket
 
+    // Set up ALL event listeners BEFORE connecting
+    // This ensures we don't miss any events
+    
+    // Listen for call state (sent when user joins room)
+    socket.on('call-state', (data: { isActive: boolean; startedBy: string | null }) => {
+      console.log('📞 Call state received:', data)
+      console.log('📞 Current user role:', userRole, 'isDoctor:', isDoctor)
+      
+      if (data.isActive) {
+        console.log('✅ Call is active, updating state...')
+        setCallStarted(true)
+        setWaitingForDoctor(false)
+        
+        // Initialize local stream if call is already active
+        const initializeLocalStream = async () => {
+          try {
+            if (!localStreamRef.current) {
+              const stream = await navigator.mediaDevices.getUserMedia({
+                video: false,
+                audio: true,
+              })
+              
+              localStreamRef.current = stream
+              
+              if (stream.getAudioTracks().length > 0) {
+                setTimeout(() => {
+                  setupAudioAnalyser(stream, 'local')
+                }, 200)
+              }
+            }
+          } catch (error) {
+            console.error("Error accessing media devices:", error)
+          }
+        }
+        
+        // Wait a bit before initializing stream
+        setTimeout(() => {
+          initializeLocalStream()
+        }, 500)
+      } else if (!isDoctor) {
+        console.log('⏳ Call not active, showing waiting screen for patient')
+        setWaitingForDoctor(true)
+        setCallStarted(false)
+      }
+    })
+
+    // Listen for call started event (broadcast to all users when doctor starts)
+    socket.on('call-started', (data: { startedBy: string; startedByName: string }) => {
+      console.log('🎬 Call started event received from:', data.startedByName)
+      console.log('🎬 Updating call state to active...')
+      
+      setCallStarted(true)
+      setWaitingForDoctor(false)
+      
+      // Initialize local stream when call starts
+      const initializeLocalStream = async () => {
+        try {
+          if (!localStreamRef.current) {
+            console.log('🎬 Initializing local media stream...')
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: false,
+              audio: true,
+            })
+            
+            localStreamRef.current = stream
+            console.log('🎬 Local stream initialized')
+            
+            if (stream.getAudioTracks().length > 0) {
+              setTimeout(() => {
+                setupAudioAnalyser(stream, 'local')
+              }, 200)
+            }
+          } else {
+            console.log('🎬 Local stream already exists')
+          }
+        } catch (error) {
+          console.error("❌ Error accessing media devices:", error)
+        }
+      }
+      
+      // Initialize stream after a short delay to ensure state is updated
+      setTimeout(() => {
+        initializeLocalStream()
+      }, 300)
+    })
+
+    // Listen for call ended event
+    socket.on('call-ended', (data: { endedBy: string; endedByName: string }) => {
+      console.log('Call ended by:', data.endedByName)
+      setCallStarted(false)
+      if (!isDoctor) {
+        setWaitingForDoctor(true)
+      }
+      // Clear all participants except local
+      setParticipants(prev => prev.filter(p => p.isLocal))
+      // Close all peer connections
+      peerConnectionsRef.current.forEach(pc => pc.close())
+      peerConnectionsRef.current.clear()
+      remoteStreamsRef.current.clear()
+    })
+
+    // Listen for errors
+    socket.on('error', (data: { message: string }) => {
+      console.error('Socket error:', data.message)
+      alert(data.message)
+    })
+
     socket.on('connect', () => {
-      console.log('Connected to signaling server')
+      console.log('✅ Connected to signaling server, socket ID:', socket.id)
+      console.log('📤 Emitting join-room with:', { appointmentId, userId, userName, userRole })
+      
+      // Emit join-room immediately - all listeners are already set up
       socket.emit('join-room', appointmentId, userId, userName, userRole)
+      
       setIsConnecting(false)
       
       // Add local participant immediately (camera off by default)
@@ -96,47 +212,87 @@ function VideoCallContent() {
       })
     })
 
-    // Listen for call state
+    // Listen for call state (sent when user joins room)
     socket.on('call-state', (data: { isActive: boolean; startedBy: string | null }) => {
-      console.log('Call state received:', data)
+      console.log('📞 Call state received:', data)
+      console.log('📞 Current user role:', userRole, 'isDoctor:', isDoctor)
+      
       if (data.isActive) {
+        console.log('✅ Call is active, updating state...')
         setCallStarted(true)
         setWaitingForDoctor(false)
+        
+        // Initialize local stream if call is already active
+        const initializeLocalStream = async () => {
+          try {
+            if (!localStreamRef.current) {
+              const stream = await navigator.mediaDevices.getUserMedia({
+                video: false,
+                audio: true,
+              })
+              
+              localStreamRef.current = stream
+              
+              if (stream.getAudioTracks().length > 0) {
+                setTimeout(() => {
+                  setupAudioAnalyser(stream, 'local')
+                }, 200)
+              }
+            }
+          } catch (error) {
+            console.error("Error accessing media devices:", error)
+          }
+        }
+        
+        // Wait a bit before initializing stream
+        setTimeout(() => {
+          initializeLocalStream()
+        }, 500)
       } else if (!isDoctor) {
+        console.log('⏳ Call not active, showing waiting screen for patient')
         setWaitingForDoctor(true)
         setCallStarted(false)
       }
     })
 
-    // Listen for call started event
+    // Listen for call started event (broadcast to all users when doctor starts)
     socket.on('call-started', (data: { startedBy: string; startedByName: string }) => {
-      console.log('Call started by:', data.startedByName)
+      console.log('🎬 Call started event received from:', data.startedByName)
+      console.log('🎬 Updating call state to active...')
+      
       setCallStarted(true)
       setWaitingForDoctor(false)
       
       // Initialize local stream when call starts
       const initializeLocalStream = async () => {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: false,
-            audio: true,
-          })
-          
-          localStreamRef.current = stream
-          
-          if (stream.getAudioTracks().length > 0) {
-            setTimeout(() => {
-              setupAudioAnalyser(stream, 'local')
-            }, 200)
+          if (!localStreamRef.current) {
+            console.log('🎬 Initializing local media stream...')
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: false,
+              audio: true,
+            })
+            
+            localStreamRef.current = stream
+            console.log('🎬 Local stream initialized')
+            
+            if (stream.getAudioTracks().length > 0) {
+              setTimeout(() => {
+                setupAudioAnalyser(stream, 'local')
+              }, 200)
+            }
+          } else {
+            console.log('🎬 Local stream already exists')
           }
         } catch (error) {
-          console.error("Error accessing media devices:", error)
+          console.error("❌ Error accessing media devices:", error)
         }
       }
       
-      if (!localStreamRef.current) {
+      // Initialize stream after a short delay to ensure state is updated
+      setTimeout(() => {
         initializeLocalStream()
-      }
+      }, 300)
     })
 
     // Listen for call ended event
@@ -962,6 +1118,7 @@ function VideoCallContent() {
 
   // Show waiting screen for patients if call hasn't started
   if (!callStarted && !isDoctor) {
+    console.log('👀 Rendering waiting screen - callStarted:', callStarted, 'isDoctor:', isDoctor, 'waitingForDoctor:', waitingForDoctor)
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center p-4">
         <Card className="w-full max-w-md p-8 text-center">
@@ -970,6 +1127,9 @@ function VideoCallContent() {
             <h2 className="text-2xl font-bold text-foreground mb-2">Waiting for Doctor</h2>
             <p className="text-muted-foreground">
               The doctor will start the call shortly. Please wait...
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Check browser console (F12) for connection status
             </p>
           </div>
           <div className="flex items-center justify-center gap-2 mb-6">
