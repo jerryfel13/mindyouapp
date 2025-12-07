@@ -360,6 +360,7 @@ export const api = {
   async initializePayment(paymentData: {
     appointment_id: string;
     payment_method: 'gcash' | 'paymaya';
+    cp_number?: string;
   }) {
     return this.request('/api/payments/initialize', {
       method: 'POST',

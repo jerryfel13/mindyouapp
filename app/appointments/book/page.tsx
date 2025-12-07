@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Heart, Calendar, Clock, ChevronLeft, ChevronRight, Loader2, CheckCircle, CreditCard, DollarSign, Lock, RefreshCw, QrCode, Copy } from "lucide-react"
+import { Heart, Calendar, Clock, ChevronLeft, ChevronRight, Loader2, CheckCircle, CreditCard, DollarSign, Lock, RefreshCw, QrCode, Copy, Phone } from "lucide-react"
 import { api } from "@/lib/api"
 import { getUserData } from "@/lib/auth"
 
@@ -44,6 +44,8 @@ function BookAppointmentPageContent() {
   const [paymentId, setPaymentId] = useState<string | null>(null)
   const [checkingPayment, setCheckingPayment] = useState(false)
   const [paymentProgress, setPaymentProgress] = useState<any>(null)
+  const [cpNumber, setCpNumber] = useState<string>('')
+  const [cpNumberError, setCpNumberError] = useState<string>('')
 
   useEffect(() => {
     const fetchDoctors = async () => {
@@ -170,9 +172,48 @@ function BookAppointmentPageContent() {
     }
   }
 
+  // Validate CP number (Philippine phone number format)
+  const validateCpNumber = (number: string): boolean => {
+    // Remove spaces, dashes, and other characters
+    const cleaned = number.replace(/[\s\-\(\)]/g, '')
+    
+    // Philippine mobile numbers: 09XXXXXXXXX (10 digits) or +639XXXXXXXXX (13 digits)
+    const phMobileRegex = /^(09|\+639)[0-9]{9}$/
+    
+    if (!cleaned) {
+      setCpNumberError('CP number is required')
+      return false
+    }
+    
+    if (!phMobileRegex.test(cleaned)) {
+      setCpNumberError('Please enter a valid Philippine mobile number (09XXXXXXXXX)')
+      return false
+    }
+    
+    setCpNumberError('')
+    return true
+  }
+
+  const handleCpNumberChange = (value: string) => {
+    // Allow only numbers, +, spaces, dashes, and parentheses
+    const cleaned = value.replace(/[^\d\+\s\-\(\)]/g, '')
+    setCpNumber(cleaned)
+    
+    // Clear error when user starts typing
+    if (cpNumberError) {
+      setCpNumberError('')
+    }
+  }
+
   const initializePayment = async () => {
     if (!appointmentId || !selectedTherapist) {
       setError("Appointment information missing")
+      return
+    }
+
+    // Validate CP number
+    if (!validateCpNumber(cpNumber)) {
+      setError("Please enter a valid CP number")
       return
     }
 
@@ -182,7 +223,8 @@ function BookAppointmentPageContent() {
     try {
       const response = await api.initializePayment({
         appointment_id: appointmentId,
-        payment_method: paymentMethod
+        payment_method: paymentMethod,
+        cp_number: cpNumber.replace(/[\s\-\(\)]/g, '') // Clean the number before sending
       })
       
       setPaymentDetails(response.data.payment_details)
@@ -805,15 +847,36 @@ function BookAppointmentPageContent() {
                   </div>
                 </div>
 
-                {/* Security Notice */}
-                <div className="flex items-start gap-3 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg mb-6">
-                  <Lock className="w-5 h-5 text-blue-500 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-foreground mb-1">Secure Payment</p>
-                    <p className="text-xs text-muted-foreground">
-                      Your payment is processed securely through {paymentMethod === 'gcash' ? 'GCash' : 'PayMaya'}. All transactions are encrypted and protected.
-                    </p>
+                {/* CP Number Input */}
+                <div className="mb-6">
+                  <label className="text-sm font-medium text-foreground mb-2 block">
+                    Contact Number (CP Number) <span className="text-destructive">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                      <Phone className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                    <input
+                      type="tel"
+                      value={cpNumber}
+                      onChange={(e) => handleCpNumberChange(e.target.value)}
+                      placeholder="09XXXXXXXXX"
+                      className={`w-full pl-10 pr-4 py-3 rounded-lg border-2 bg-background text-foreground ${
+                        cpNumberError
+                          ? 'border-destructive focus:border-destructive'
+                          : 'border-border focus:border-primary'
+                      } focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                    />
                   </div>
+                  {cpNumberError && (
+                    <p className="text-sm text-destructive mt-2 flex items-center gap-1">
+                      <span>⚠</span>
+                      {cpNumberError}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Enter your {paymentMethod === 'gcash' ? 'GCash' : 'PayMaya'} registered mobile number (e.g., 09123456789)
+                  </p>
                 </div>
 
                 {/* Initialize Payment Button */}
