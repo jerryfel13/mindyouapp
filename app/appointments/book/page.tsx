@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Heart, Calendar, Clock, ChevronLeft, ChevronRight, Loader2, CheckCircle, CreditCard, DollarSign, Lock, RefreshCw, QrCode, Copy, Phone } from "lucide-react"
+import { Heart, Calendar, Clock, ChevronLeft, ChevronRight, Loader2, CheckCircle } from "lucide-react"
 import { api } from "@/lib/api"
 import { getUserData } from "@/lib/auth"
 
@@ -36,16 +36,6 @@ function BookAppointmentPageContent() {
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [appointmentId, setAppointmentId] = useState<string | null>(null)
-  const [paymentMethod, setPaymentMethod] = useState<string>('gcash')
-  const [processingPayment, setProcessingPayment] = useState(false)
-  const [paymentCompleted, setPaymentCompleted] = useState(false)
-  const [paymentInitialized, setPaymentInitialized] = useState(false)
-  const [paymentDetails, setPaymentDetails] = useState<any>(null)
-  const [paymentId, setPaymentId] = useState<string | null>(null)
-  const [checkingPayment, setCheckingPayment] = useState(false)
-  const [paymentProgress, setPaymentProgress] = useState<any>(null)
-  const [cpNumber, setCpNumber] = useState<string>('')
-  const [cpNumberError, setCpNumberError] = useState<string>('')
 
   useEffect(() => {
     const fetchDoctors = async () => {
@@ -68,17 +58,6 @@ function BookAppointmentPageContent() {
 
     fetchDoctors()
   }, [doctorIdFromUrl])
-
-  // Auto-check payment status every 5 seconds when payment is initialized
-  useEffect(() => {
-    if (paymentInitialized && paymentId && !paymentCompleted) {
-      const interval = setInterval(() => {
-        checkPaymentStatus()
-      }, 5000) // Check every 5 seconds
-
-      return () => clearInterval(interval)
-    }
-  }, [paymentInitialized, paymentId, paymentCompleted])
 
   const timeSlots = ["9:00 AM", "10:00 AM", "11:00 AM", "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM"]
 
@@ -162,8 +141,8 @@ function BookAppointmentPageContent() {
       const response = await api.createAppointment(appointmentData)
       setAppointmentId(response.data.id)
       
-      // Move to payment step
-      setStep(4)
+      // Redirect to confirmation page
+      router.push(`/appointments/confirmation?id=${response.data.id}`)
     } catch (err) {
       console.error('Error creating appointment:', err)
       setError(err instanceof Error ? err.message : 'Failed to create appointment. Please try again.')
@@ -172,160 +151,6 @@ function BookAppointmentPageContent() {
     }
   }
 
-  // Validate CP number (Philippine phone number format - exactly 11 digits)
-  const validateCpNumber = (number: string): boolean => {
-    // Remove spaces, dashes, and other characters
-    const cleaned = number.replace(/[\s\-\(\)\+]/g, '')
-    
-    // Philippine mobile numbers: Must be exactly 11 digits starting with 09
-    // Format: 09XXXXXXXXX (11 digits total)
-    const phMobileRegex = /^09[0-9]{9}$/
-    
-    if (!cleaned) {
-      setCpNumberError('Mobile number is required')
-      return false
-    }
-    
-    // Check if it's exactly 11 digits
-    if (cleaned.length !== 11) {
-      setCpNumberError('Mobile number must be exactly 11 digits (e.g., 09123456789)')
-      return false
-    }
-    
-    // Check if it starts with 09 and has exactly 11 digits
-    if (!phMobileRegex.test(cleaned)) {
-      setCpNumberError('Mobile number must start with 09 and be exactly 11 digits')
-      return false
-    }
-    
-    setCpNumberError('')
-    return true
-  }
-
-  const handleCpNumberChange = (value: string) => {
-    // Allow only numbers, limit to 11 digits
-    const cleaned = value.replace(/[^\d]/g, '').slice(0, 11)
-    setCpNumber(cleaned)
-    
-    // Clear error when user starts typing
-    if (cpNumberError) {
-      setCpNumberError('')
-    }
-    
-    // Auto-validate as user types (if 11 digits entered)
-    if (cleaned.length === 11) {
-      validateCpNumber(cleaned)
-    }
-  }
-
-  const initializePayment = async () => {
-    if (!appointmentId || !selectedTherapist) {
-      setError("Appointment information missing")
-      return
-    }
-
-    // Validate CP number
-    if (!validateCpNumber(cpNumber)) {
-      setError("Please enter a valid CP number")
-      return
-    }
-
-    setProcessingPayment(true)
-    setError(null)
-
-    try {
-      const response = await api.initializePayment({
-        appointment_id: appointmentId,
-        payment_method: paymentMethod,
-        cp_number: cpNumber.replace(/[\s\-\(\)]/g, '') // Clean the number before sending
-      })
-      
-      setPaymentDetails(response.data.payment_details)
-      setPaymentId(response.data.payment.id)
-      setPaymentInitialized(true)
-    } catch (err) {
-      console.error('Error initializing payment:', err)
-      setError(err instanceof Error ? err.message : 'Failed to initialize payment. Please try again.')
-    } finally {
-      setProcessingPayment(false)
-    }
-  }
-
-  const checkPaymentStatus = async () => {
-    if (!paymentId) return
-
-    setCheckingPayment(true)
-    try {
-      const response = await api.verifyPayment(paymentId)
-      
-      // Also fetch payment progress
-      const progressResponse = await api.getPaymentProgress(paymentId)
-      setPaymentProgress(progressResponse.data)
-      
-      if (response.data.payment_status === 'completed') {
-        setPaymentCompleted(true)
-        // Redirect to confirmation page after a short delay
-        setTimeout(() => {
-          router.push(`/appointments/confirmation?id=${appointmentId}`)
-        }, 1500)
-      }
-    } catch (err) {
-      console.error('Error checking payment status:', err)
-    } finally {
-      setCheckingPayment(false)
-    }
-  }
-
-  // Fetch payment progress when payment is initialized
-  useEffect(() => {
-    const fetchPaymentProgress = async () => {
-      if (paymentId && paymentInitialized) {
-        try {
-          const response = await api.getPaymentProgress(paymentId)
-          setPaymentProgress(response.data)
-        } catch (err) {
-          console.error('Error fetching payment progress:', err)
-        }
-      }
-    }
-
-    fetchPaymentProgress()
-  }, [paymentId, paymentInitialized])
-
-  // Auto-check payment status every 5 seconds when payment is initialized
-  useEffect(() => {
-    if (paymentInitialized && paymentId && !paymentCompleted) {
-      const checkStatus = async () => {
-        if (!paymentId) return
-        setCheckingPayment(true)
-        try {
-          const response = await api.verifyPayment(paymentId)
-          
-          // Also fetch payment progress
-          try {
-            const progressResponse = await api.getPaymentProgress(paymentId)
-            setPaymentProgress(progressResponse.data)
-          } catch (progressErr) {
-            console.error('Error fetching payment progress:', progressErr)
-          }
-          
-          if (response.data.payment_status === 'completed') {
-            setPaymentCompleted(true)
-            setTimeout(() => {
-              router.push(`/appointments/confirmation?id=${appointmentId}`)
-            }, 1500)
-          }
-        } catch (err) {
-          console.error('Error checking payment status:', err)
-        } finally {
-          setCheckingPayment(false)
-        }
-      }
-
-      const interval = setInterval(checkStatus, 5000) // Check every 5 seconds
-      return () => clearInterval(interval)
-    }
-  }, [paymentInitialized, paymentId, paymentCompleted, appointmentId])
 
   const selectedDoctor = doctors.find((d) => d.id === selectedTherapist)
 
@@ -351,7 +176,7 @@ function BookAppointmentPageContent() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-8">
-          {[1, 2, 3, 4].map((s) => (
+          {[1, 2, 3].map((s) => (
             <div key={s} className="flex items-center flex-1">
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
@@ -360,7 +185,7 @@ function BookAppointmentPageContent() {
               >
                 {s}
               </div>
-              {s < 4 && <div className={`flex-1 h-1 mx-2 ${s < step ? "bg-primary" : "bg-muted"}`}></div>}
+              {s < 3 && <div className={`flex-1 h-1 mx-2 ${s < step ? "bg-primary" : "bg-muted"}`}></div>}
             </div>
           ))}
         </div>
@@ -370,13 +195,11 @@ function BookAppointmentPageContent() {
             {step === 1 && "Select a Therapist"}
             {step === 2 && "Choose Date & Time"}
             {step === 3 && "Confirm Booking"}
-            {step === 4 && "Complete Payment"}
           </h1>
           <p className="text-muted-foreground">
             {step === 1 && "Browse our network of qualified mental health professionals"}
             {step === 2 && "Pick a date and time that works for you"}
             {step === 3 && "Review and confirm your appointment"}
-            {step === 4 && "Secure payment to finalize your appointment"}
           </p>
         </div>
 
@@ -549,373 +372,6 @@ function BookAppointmentPageContent() {
           </Card>
         )}
 
-        {step === 4 && (
-          <Card className="p-8 mb-8">
-            {paymentCompleted ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="w-8 h-8 text-green-500" />
-                </div>
-                <h3 className="text-2xl font-semibold text-foreground mb-2">Payment Successful!</h3>
-                <p className="text-muted-foreground mb-4">Redirecting to confirmation page...</p>
-                <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto" />
-              </div>
-            ) : paymentInitialized && paymentDetails ? (
-              <>
-                <div className="text-center mb-6">
-                  <h3 className="text-xl font-semibold text-foreground mb-2">Complete Your Payment</h3>
-                  <p className="text-muted-foreground">Follow the instructions below to complete your payment</p>
-                </div>
-
-                {error && (
-                  <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg mb-6">
-                    <p className="text-sm text-destructive">{error}</p>
-                  </div>
-                )}
-
-                {/* Payment Progress Indicator */}
-                {paymentProgress && (
-                  <div className="bg-muted/50 rounded-lg p-6 mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="font-semibold text-foreground">Payment Progress</h4>
-                      <span className="text-sm font-medium text-primary">
-                        {paymentProgress.progress_percentage}%
-                      </span>
-                    </div>
-                    {/* Progress Bar */}
-                    <div className="w-full bg-muted rounded-full h-2 mb-4">
-                      <div
-                        className="bg-primary h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${paymentProgress.progress_percentage}%` }}
-                      />
-                    </div>
-                    {/* Progress Stages */}
-                    <div className="space-y-3">
-                      {paymentProgress.stages.map((stage: any, index: number) => (
-                        <div
-                          key={index}
-                          className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
-                            stage.status === 'completed'
-                              ? 'bg-green-500/10 border border-green-500/20'
-                              : stage.status === 'current' || stage.isCurrent
-                              ? 'bg-primary/10 border border-primary/20'
-                              : 'bg-muted/30 border border-border'
-                          }`}
-                        >
-                          <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                              stage.status === 'completed'
-                                ? 'bg-green-500 text-white'
-                                : stage.status === 'current' || stage.isCurrent
-                                ? 'bg-primary text-white'
-                                : 'bg-muted text-muted-foreground'
-                            }`}
-                          >
-                            {stage.status === 'completed' ? (
-                              <CheckCircle className="w-5 h-5" />
-                            ) : stage.status === 'current' || stage.isCurrent ? (
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : (
-                              <span className="text-xs font-bold">{index + 1}</span>
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <p
-                              className={`text-sm font-medium ${
-                                stage.status === 'completed'
-                                  ? 'text-green-500'
-                                  : stage.status === 'current' || stage.isCurrent
-                                  ? 'text-primary'
-                                  : 'text-muted-foreground'
-                              }`}
-                            >
-                              {stage.label}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{stage.description}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Payment Amount */}
-                <div className="bg-primary/10 border border-primary/20 rounded-lg p-6 mb-6 text-center">
-                  <p className="text-sm text-muted-foreground mb-2">Amount to Pay</p>
-                  <p className="text-4xl font-bold text-primary">
-                    ₱{paymentDetails.amount.toFixed(2)}
-                  </p>
-                </div>
-
-                {/* QR Code */}
-                <div className="flex justify-center mb-6">
-                  <div className="bg-white p-6 rounded-lg border-2 border-border">
-                    <div className="w-64 h-64 bg-muted flex items-center justify-center rounded-lg">
-                      <QrCode className="w-32 h-32 text-muted-foreground" />
-                      <p className="text-xs text-muted-foreground mt-2">QR Code will be displayed here</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Payment Instructions */}
-                <div className="bg-muted/50 rounded-lg p-6 mb-6">
-                  <h4 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                    <CreditCard className="w-5 h-5 text-primary" />
-                    Payment Instructions
-                  </h4>
-                  <ol className="space-y-3">
-                    {paymentDetails.payment_instructions.map((instruction: string, index: number) => (
-                      <li key={index} className="flex gap-3 text-sm text-foreground">
-                        <span className="font-bold text-primary min-w-[24px]">{index + 1}.</span>
-                        <span>{instruction}</span>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-
-                {/* Payment Details */}
-                <div className="bg-muted/50 rounded-lg p-6 mb-6">
-                  <h4 className="font-semibold text-foreground mb-4">Payment Details</h4>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Account Number</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground font-mono">
-                          {paymentDetails.account_number}
-                        </span>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(paymentDetails.account_number)
-                            alert('Account number copied!')
-                          }}
-                          className="p-1 hover:bg-muted rounded"
-                        >
-                          <Copy className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Account Name</span>
-                      <span className="text-sm font-medium text-foreground">{paymentDetails.account_name}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Reference Number</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground font-mono">
-                          {paymentDetails.reference_number}
-                        </span>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(paymentDetails.reference_number)
-                            alert('Reference number copied!')
-                          }}
-                          className="p-1 hover:bg-muted rounded"
-                        >
-                          <Copy className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Expires In</span>
-                      <span className="text-sm font-medium text-foreground">{paymentDetails.expiry_minutes} minutes</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Status Check */}
-                <div className="flex items-center justify-between p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg mb-6">
-                  <div className="flex items-center gap-3">
-                    <RefreshCw className={`w-5 h-5 text-blue-500 ${checkingPayment ? 'animate-spin' : ''}`} />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Checking payment status...</p>
-                      <p className="text-xs text-muted-foreground">We'll automatically verify your payment</p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={checkPaymentStatus}
-                    disabled={checkingPayment}
-                    variant="outline"
-                    size="sm"
-                  >
-                    {checkingPayment ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-1" />
-                        Check Now
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {/* Cancel Payment */}
-                <Button
-                  onClick={async () => {
-                    if (paymentId) {
-                      try {
-                        await api.cancelPayment(paymentId, 'Cancelled by user')
-                        setPaymentInitialized(false)
-                        setPaymentDetails(null)
-                        setPaymentId(null)
-                        setStep(3)
-                      } catch (err) {
-                        console.error('Error cancelling payment:', err)
-                      }
-                    }
-                  }}
-                  variant="outline"
-                  className="w-full"
-                >
-                  Cancel Payment
-                </Button>
-              </>
-            ) : (
-              <>
-                <h3 className="text-xl font-semibold text-foreground mb-6">Payment Details</h3>
-                {error && (
-                  <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg mb-6">
-                    <p className="text-sm text-destructive">{error}</p>
-                  </div>
-                )}
-                
-                {/* Appointment Summary */}
-                <div className="bg-muted/50 rounded-lg p-6 mb-6">
-                  <h4 className="font-semibold text-foreground mb-4">Appointment Summary</h4>
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Therapist</span>
-                      <span className="font-medium text-foreground">
-                        {selectedDoctor?.full_name || 'Not selected'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Date</span>
-                      <span className="font-medium text-foreground">
-                        {monthName.split(" ")[0]} {selectedDate}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Time</span>
-                      <span className="font-medium text-foreground">{selectedTime}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Duration</span>
-                      <span className="font-medium text-foreground">60 minutes</span>
-                    </div>
-                    <div className="border-t border-border pt-3 mt-3">
-                      <div className="flex justify-between">
-                        <span className="text-lg font-semibold text-foreground">Total Amount</span>
-                        <span className="text-2xl font-bold text-primary">
-                          {selectedDoctor?.consultation_fee 
-                            ? `₱${parseFloat(selectedDoctor.consultation_fee).toFixed(2)}`
-                            : 'N/A'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Payment Method Selection */}
-                <div className="mb-6">
-                  <label className="text-sm font-medium text-foreground mb-3 block">Payment Method</label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      onClick={() => setPaymentMethod('gcash')}
-                      disabled={processingPayment}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        paymentMethod === 'gcash'
-                          ? 'border-primary bg-primary/10'
-                          : 'border-border hover:border-primary/50'
-                      } ${processingPayment ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-blue-500 flex items-center justify-center">
-                          <span className="text-white font-bold text-sm">GC</span>
-                        </div>
-                        <div className="text-left">
-                          <p className="font-medium text-foreground">GCash</p>
-                          <p className="text-xs text-muted-foreground">Mobile Wallet</p>
-                        </div>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => setPaymentMethod('paymaya')}
-                      disabled={processingPayment}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        paymentMethod === 'paymaya'
-                          ? 'border-primary bg-primary/10'
-                          : 'border-border hover:border-primary/50'
-                      } ${processingPayment ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-green-500 flex items-center justify-center">
-                          <span className="text-white font-bold text-sm">PM</span>
-                        </div>
-                        <div className="text-left">
-                          <p className="font-medium text-foreground">PayMaya</p>
-                          <p className="text-xs text-muted-foreground">Mobile Wallet</p>
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                {/* CP Number Input */}
-                <div className="mb-6">
-                  <label className="text-sm font-medium text-foreground mb-2 block">
-                    Contact Number (CP Number) <span className="text-destructive">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                      <Phone className="w-5 h-5 text-muted-foreground" />
-                    </div>
-                    <input
-                      type="tel"
-                      value={cpNumber}
-                      onChange={(e) => handleCpNumberChange(e.target.value)}
-                      placeholder="09123456789"
-                      maxLength={11}
-                      className={`w-full pl-10 pr-4 py-3 rounded-lg border-2 bg-background text-foreground ${
-                        cpNumberError
-                          ? 'border-destructive focus:border-destructive'
-                          : 'border-border focus:border-primary'
-                      } focus:outline-none focus:ring-2 focus:ring-primary/20`}
-                    />
-                  </div>
-                  {cpNumberError && (
-                    <p className="text-sm text-destructive mt-2 flex items-center gap-1">
-                      <span>⚠</span>
-                      {cpNumberError}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Enter your {paymentMethod === 'gcash' ? 'GCash' : 'PayMaya'} registered mobile number (11 digits, e.g., 09123456789)
-                  </p>
-                </div>
-
-                {/* Confirm Payment Button */}
-                <Button
-                  onClick={initializePayment}
-                  disabled={processingPayment || !selectedDoctor?.consultation_fee || !cpNumber || !!cpNumberError}
-                  className="w-full bg-primary hover:bg-primary/90"
-                  size="lg"
-                >
-                  {processingPayment ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Confirming...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Confirm
-                    </>
-                  )}
-                </Button>
-              </>
-            )}
-          </Card>
-        )}
 
         <div className="flex gap-4">
           {step > 1 && (
@@ -952,16 +408,6 @@ function BookAppointmentPageContent() {
                   <ChevronRight className="w-4 h-4 ml-2" />
                 </>
               )}
-            </Button>
-          )}
-          {step === 4 && !paymentCompleted && (
-            <Button 
-              onClick={() => setStep(3)} 
-              variant="outline"
-              className="bg-transparent"
-            >
-              <ChevronLeft className="w-4 h-4 mr-2" />
-              Back
             </Button>
           )}
         </div>
