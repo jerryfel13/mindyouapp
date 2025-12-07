@@ -420,5 +420,73 @@ export const api = {
       body: JSON.stringify(paymentData),
     });
   },
+
+  // ========== NOTIFICATIONS ==========
+  async getNotifications(filters?: { is_read?: boolean; type?: string; limit?: number }) {
+    const queryParams = new URLSearchParams();
+    if (filters?.is_read !== undefined) queryParams.append('is_read', String(filters.is_read));
+    if (filters?.type) queryParams.append('type', filters.type);
+    if (filters?.limit) queryParams.append('limit', String(filters.limit));
+    
+    const queryString = queryParams.toString();
+    return this.request(`/api/notifications${queryString ? `?${queryString}` : ''}`, {
+      method: 'GET',
+    });
+  },
+
+  async getUnreadNotificationCount() {
+    return this.request('/api/notifications/unread-count', {
+      method: 'GET',
+    });
+  },
+
+  async markNotificationAsRead(notificationId: string) {
+    return this.request(`/api/notifications/${notificationId}/read`, {
+      method: 'POST',
+    });
+  },
+
+  async markAllNotificationsAsRead() {
+    return this.request('/api/notifications/read-all', {
+      method: 'POST',
+    });
+  },
+
+  async deleteNotification(notificationId: string) {
+    return this.request(`/api/notifications/${notificationId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // ========== SETTINGS ==========
+  async getSettings(category?: string) {
+    const queryParams = new URLSearchParams();
+    if (category) queryParams.append('category', category);
+    
+    const queryString = queryParams.toString();
+    return this.request(`/api/settings${queryString ? `?${queryString}` : ''}`, {
+      method: 'GET',
+    });
+  },
+
+  async updateSetting(category: string, key: string, value: any) {
+    return this.request('/api/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ category, key, value }),
+    });
+  },
+
+  async updateSettings(category: string, settings: Record<string, any>) {
+    return this.request('/api/settings/bulk', {
+      method: 'PUT',
+      body: JSON.stringify({ category, settings }),
+    });
+  },
+
+  async deleteSetting(category: string, key: string) {
+    return this.request(`/api/settings/${category}/${key}`, {
+      method: 'DELETE',
+    });
+  },
 };
 

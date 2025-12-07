@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Heart, Calendar, Clock, MapPin, LogOut, Settings, Bell, ChevronRight, Users, Loader2, DollarSign } from "lucide-react"
+import { NotificationBell } from "@/components/NotificationBell"
 import ProtectedRoute from "@/components/protected-route"
 import { getUserData, clearAuth } from "@/lib/auth"
 import { useRouter } from "next/navigation"
@@ -163,12 +164,12 @@ function DashboardContent() {
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="p-2 hover:bg-muted rounded-lg transition-colors">
-              <Bell className="w-5 h-5 text-foreground" />
-            </button>
-            <button className="p-2 hover:bg-muted rounded-lg transition-colors">
-              <Settings className="w-5 h-5 text-foreground" />
-            </button>
+            <NotificationBell />
+            <Link href="/settings">
+              <button className="p-2 hover:bg-muted rounded-lg transition-colors">
+                <Settings className="w-5 h-5 text-foreground" />
+              </button>
+            </Link>
             <div className="flex items-center gap-3 pl-4 border-l border-border">
               <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold">
                 {user.avatar}
