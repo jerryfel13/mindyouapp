@@ -40,7 +40,7 @@ function VideoCallContent() {
   const appointmentId = searchParams.get("id") || "1"
   const userData = getUserData()
   
-  const [isMuted, setIsMuted] = useState(false)
+  const [isMuted, setIsMuted] = useState(true) // Muted by default
   const [isVideoOff, setIsVideoOff] = useState(true) // Camera off by default
   const [isScreenSharing, setIsScreenSharing] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -100,135 +100,10 @@ function VideoCallContent() {
                 audio: true,
               })
               
-              localStreamRef.current = stream
-              
-              if (stream.getAudioTracks().length > 0) {
-                setTimeout(() => {
-                  setupAudioAnalyser(stream, 'local')
-                }, 200)
-              }
-            }
-          } catch (error) {
-            console.error("Error accessing media devices:", error)
-          }
-        }
-        
-        // Wait a bit before initializing stream
-        setTimeout(() => {
-          initializeLocalStream()
-        }, 500)
-      } else if (!isDoctor) {
-        console.log('⏳ Call not active, showing waiting screen for patient')
-        setWaitingForDoctor(true)
-        setCallStarted(false)
-      }
-    })
-
-    // Listen for call started event (broadcast to all users when doctor starts)
-    socket.on('call-started', (data: { startedBy: string; startedByName: string }) => {
-      console.log('🎬 Call started event received from:', data.startedByName)
-      console.log('🎬 Updating call state to active...')
-      
-      setCallStarted(true)
-      setWaitingForDoctor(false)
-      
-      // Initialize local stream when call starts
-      const initializeLocalStream = async () => {
-        try {
-          if (!localStreamRef.current) {
-            console.log('🎬 Initializing local media stream...')
-            const stream = await navigator.mediaDevices.getUserMedia({
-              video: false,
-              audio: true,
-            })
-            
-            localStreamRef.current = stream
-            console.log('🎬 Local stream initialized')
-            
-            if (stream.getAudioTracks().length > 0) {
-              setTimeout(() => {
-                setupAudioAnalyser(stream, 'local')
-              }, 200)
-            }
-          } else {
-            console.log('🎬 Local stream already exists')
-          }
-        } catch (error) {
-          console.error("❌ Error accessing media devices:", error)
-        }
-      }
-      
-      // Initialize stream after a short delay to ensure state is updated
-      setTimeout(() => {
-        initializeLocalStream()
-      }, 300)
-    })
-
-    // Listen for call ended event
-    socket.on('call-ended', (data: { endedBy: string; endedByName: string }) => {
-      console.log('Call ended by:', data.endedByName)
-      setCallStarted(false)
-      if (!isDoctor) {
-        setWaitingForDoctor(true)
-      }
-      // Clear all participants except local
-      setParticipants(prev => prev.filter(p => p.isLocal))
-      // Close all peer connections
-      peerConnectionsRef.current.forEach(pc => pc.close())
-      peerConnectionsRef.current.clear()
-      remoteStreamsRef.current.clear()
-    })
-
-    // Listen for errors
-    socket.on('error', (data: { message: string }) => {
-      console.error('Socket error:', data.message)
-      alert(data.message)
-    })
-
-    socket.on('connect', () => {
-      console.log('✅ Connected to signaling server, socket ID:', socket.id)
-      console.log('📤 Emitting join-room with:', { appointmentId, userId, userName, userRole })
-      
-      // Emit join-room immediately - all listeners are already set up
-      socket.emit('join-room', appointmentId, userId, userName, userRole)
-      
-      setIsConnecting(false)
-      
-      // Add local participant immediately (camera off by default)
-      setParticipants(prev => {
-        const existing = prev.find(p => p.isLocal)
-        if (!existing) {
-          return [{
-            id: userId,
-            socketId: socket.id,
-            name: userName,
-            isLocal: true,
-            isMuted: false,
-            isVideoOff: true, // Camera off by default
-            isSpeaking: false,
-          }]
-        }
-        return prev
-      })
-    })
-
-    // Listen for call state (sent when user joins room)
-    socket.on('call-state', (data: { isActive: boolean; startedBy: string | null }) => {
-      console.log('📞 Call state received:', data)
-      console.log('📞 Current user role:', userRole, 'isDoctor:', isDoctor)
-      
-      if (data.isActive) {
-        console.log('✅ Call is active, updating state...')
-        setCallStarted(true)
-        setWaitingForDoctor(false)
-        
-        // Initialize local stream if call is already active
-        const initializeLocalStream = async () => {
-          try {
-            if (!localStreamRef.current) {
-              const stream = await navigator.mediaDevices.getUserMedia({
-                video: false,
-                audio: true,
+              // Mute audio tracks by default
+              stream.getAudioTracks().forEach(track => {
+                track.enabled = false
+                console.log('Microphone muted by default')
               })
               
               localStreamRef.current = stream
@@ -273,8 +148,14 @@ function VideoCallContent() {
               audio: true,
             })
             
+            // Mute audio tracks by default
+            stream.getAudioTracks().forEach(track => {
+              track.enabled = false
+              console.log('🎬 Microphone muted by default')
+            })
+            
             localStreamRef.current = stream
-            console.log('🎬 Local stream initialized')
+            console.log('🎬 Local stream initialized (muted)')
             
             if (stream.getAudioTracks().length > 0) {
               setTimeout(() => {
@@ -283,6 +164,161 @@ function VideoCallContent() {
             }
           } else {
             console.log('🎬 Local stream already exists')
+            // Ensure it's still muted
+            if (localStreamRef.current) {
+              localStreamRef.current.getAudioTracks().forEach(track => {
+                track.enabled = false
+              })
+            }
+          }
+        } catch (error) {
+          console.error("❌ Error accessing media devices:", error)
+        }
+      }
+      
+      // Initialize stream after a short delay to ensure state is updated
+      setTimeout(() => {
+        initializeLocalStream()
+      }, 300)
+    })
+
+    // Listen for call ended event
+    socket.on('call-ended', (data: { endedBy: string; endedByName: string }) => {
+      console.log('Call ended by:', data.endedByName)
+      setCallStarted(false)
+      if (!isDoctor) {
+        setWaitingForDoctor(true)
+      }
+      // Clear all participants except local
+      setParticipants(prev => prev.filter(p => p.isLocal))
+      // Close all peer connections
+      peerConnectionsRef.current.forEach(pc => pc.close())
+      peerConnectionsRef.current.clear()
+      remoteStreamsRef.current.clear()
+    })
+
+    // Listen for errors
+    socket.on('error', (data: { message: string }) => {
+      console.error('Socket error:', data.message)
+      alert(data.message)
+    })
+
+    socket.on('connect', () => {
+      console.log('✅ Connected to signaling server, socket ID:', socket.id)
+      console.log('📤 Emitting join-room with:', { appointmentId, userId, userName, userRole })
+      
+      // Emit join-room immediately - all listeners are already set up
+      socket.emit('join-room', appointmentId, userId, userName, userRole)
+      
+      setIsConnecting(false)
+      
+      // Add local participant immediately (camera and mic off by default)
+      setParticipants(prev => {
+        const existing = prev.find(p => p.isLocal)
+        if (!existing) {
+          return [{
+            id: userId,
+            socketId: socket.id,
+            name: userName,
+            isLocal: true,
+            isMuted: true, // Mic muted by default
+            isVideoOff: true, // Camera off by default
+            isSpeaking: false,
+          }]
+        }
+        return prev
+      })
+    })
+
+    // Listen for call state (sent when user joins room)
+    socket.on('call-state', (data: { isActive: boolean; startedBy: string | null }) => {
+      console.log('📞 Call state received:', data)
+      console.log('📞 Current user role:', userRole, 'isDoctor:', isDoctor)
+      
+      if (data.isActive) {
+        console.log('✅ Call is active, updating state...')
+        setCallStarted(true)
+        setWaitingForDoctor(false)
+        
+        // Initialize local stream if call is already active
+        const initializeLocalStream = async () => {
+          try {
+            if (!localStreamRef.current) {
+              const stream = await navigator.mediaDevices.getUserMedia({
+                video: false,
+                audio: true,
+              })
+              
+              // Mute audio tracks by default
+              stream.getAudioTracks().forEach(track => {
+                track.enabled = false
+                console.log('Microphone muted by default')
+              })
+              
+              localStreamRef.current = stream
+              
+              if (stream.getAudioTracks().length > 0) {
+                setTimeout(() => {
+                  setupAudioAnalyser(stream, 'local')
+                }, 200)
+              }
+            }
+          } catch (error) {
+            console.error("Error accessing media devices:", error)
+          }
+        }
+        
+        // Wait a bit before initializing stream
+        setTimeout(() => {
+          initializeLocalStream()
+        }, 500)
+      } else if (!isDoctor) {
+        console.log('⏳ Call not active, showing waiting screen for patient')
+        setWaitingForDoctor(true)
+        setCallStarted(false)
+      }
+    })
+
+    // Listen for call started event (broadcast to all users when doctor starts)
+    socket.on('call-started', (data: { startedBy: string; startedByName: string }) => {
+      console.log('🎬 Call started event received from:', data.startedByName)
+      console.log('🎬 Updating call state to active...')
+      
+      setCallStarted(true)
+      setWaitingForDoctor(false)
+      
+      // Initialize local stream when call starts
+      const initializeLocalStream = async () => {
+        try {
+          if (!localStreamRef.current) {
+            console.log('🎬 Initializing local media stream...')
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: false,
+              audio: true,
+            })
+            
+            // Mute audio tracks by default
+            stream.getAudioTracks().forEach(track => {
+              track.enabled = false
+              console.log('🎬 Microphone muted by default')
+            })
+            
+            localStreamRef.current = stream
+            console.log('🎬 Local stream initialized (muted)')
+            
+            if (stream.getAudioTracks().length > 0) {
+              setTimeout(() => {
+                setupAudioAnalyser(stream, 'local')
+              }, 200)
+            }
+          } else {
+            console.log('🎬 Local stream already exists')
+            // Ensure it's still muted
+            if (localStreamRef.current) {
+              localStreamRef.current.getAudioTracks().forEach(track => {
+                track.enabled = false
+              })
+            }
           }
         } catch (error) {
           console.error("❌ Error accessing media devices:", error)
@@ -385,7 +421,7 @@ function VideoCallContent() {
     }
   }, [appointmentId, userId, userName])
 
-  // Initialize local audio stream (video off by default)
+  // Initialize local audio stream (video off by default, mic muted by default)
   useEffect(() => {
     const initializeLocalStream = async () => {
       try {
@@ -395,9 +431,15 @@ function VideoCallContent() {
           audio: true,
         })
         
+        // Mute audio tracks by default
+        stream.getAudioTracks().forEach(track => {
+          track.enabled = false
+          console.log('Microphone muted by default')
+        })
+        
         localStreamRef.current = stream
         
-        // Setup audio analyser immediately for local stream
+        // Setup audio analyser immediately for local stream (even if muted)
         if (stream.getAudioTracks().length > 0) {
           setTimeout(() => {
             setupAudioAnalyser(stream, 'local')
@@ -643,28 +685,63 @@ function VideoCallContent() {
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         if (track.readyState === 'live') {
+          console.log(`Adding ${track.kind} track to peer connection for ${targetSocketId}`)
           peerConnection.addTrack(track, localStreamRef.current!)
+        } else {
+          console.warn(`Track ${track.kind} is not live (state: ${track.readyState})`)
         }
+      })
+      
+      // Log what tracks we're sending
+      const audioTracks = localStreamRef.current.getAudioTracks()
+      const videoTracks = localStreamRef.current.getVideoTracks()
+      console.log(`Sending to ${targetSocketId}: ${audioTracks.length} audio track(s), ${videoTracks.length} video track(s)`)
+      audioTracks.forEach(track => {
+        console.log(`  Audio track: enabled=${track.enabled}, readyState=${track.readyState}, muted=${track.muted}`)
       })
     }
 
     // Handle remote stream
     peerConnection.ontrack = (event) => {
       console.log(`✅ Received remote stream from ${targetSocketId} (${targetUserName})`)
-      console.log('Stream tracks:', event.streams[0].getTracks().map(t => ({ kind: t.kind, enabled: t.enabled, readyState: t.readyState })))
+      console.log('Stream tracks:', event.streams[0].getTracks().map(t => ({ 
+        kind: t.kind, 
+        enabled: t.enabled, 
+        readyState: t.readyState,
+        muted: t.muted,
+        id: t.id
+      })))
       
       const remoteStream = event.streams[0]
       remoteStreamsRef.current.set(targetSocketId, remoteStream)
       
+      // Ensure audio tracks are enabled
+      remoteStream.getAudioTracks().forEach(track => {
+        console.log(`Remote audio track: enabled=${track.enabled}, readyState=${track.readyState}, muted=${track.muted}`)
+        if (!track.enabled) {
+          console.warn(`⚠️ Remote audio track is disabled, enabling it...`)
+          track.enabled = true
+        }
+      })
+      
       // Setup audio analyser for voice detection immediately
       if (remoteStream.getAudioTracks().length > 0) {
         const audioTrack = remoteStream.getAudioTracks()[0]
-        if (audioTrack.enabled && audioTrack.readyState === 'live') {
+        console.log(`Setting up audio analyser for remote stream from ${targetSocketId}`)
+        if (audioTrack.readyState === 'live') {
           // Small delay to ensure stream is ready
           setTimeout(() => {
             setupAudioAnalyser(remoteStream, targetSocketId)
           }, 200)
+        } else {
+          // Wait for track to become live
+          audioTrack.addEventListener('live', () => {
+            console.log(`Remote audio track became live for ${targetSocketId}`)
+            setupAudioAnalyser(remoteStream, targetSocketId)
+          })
         }
+      } else {
+        console.warn(`⚠️ No audio tracks in remote stream from ${targetSocketId}`)
       }
       
       // Update participant with stream
@@ -739,7 +816,13 @@ function VideoCallContent() {
     if (isInitiator) {
       try {
         // Wait a moment to ensure tracks are added
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise(resolve => setTimeout(resolve, 200))
+        
+        // Verify tracks are added before creating offer
+        const senders = peerConnection.getSenders()
+        console.log(`Senders for ${targetSocketId}:`, senders.map(s => ({
+          track: s.track ? { kind: s.track.kind, enabled: s.track.enabled, readyState: s.track.readyState } : null
+        })))
         
         const offer = await peerConnection.createOffer({
           offerToReceiveAudio: true,
@@ -747,6 +830,7 @@ function VideoCallContent() {
         })
         await peerConnection.setLocalDescription(offer)
         console.log(`Created offer for ${targetSocketId} (${targetUserName})`)
+        console.log(`Offer SDP (audio):`, offer.sdp?.includes('audio') ? '✅ Has audio' : '❌ No audio')
         
         if (socketRef.current) {
           socketRef.current.emit('offer', {
@@ -763,6 +847,7 @@ function VideoCallContent() {
 
   const handleOffer = async (offer: RTCSessionDescriptionInit, senderSocketId: string, senderUserId: string, senderUserName: string) => {
     console.log(`Handling offer from ${senderSocketId} (${senderUserName})`)
+    console.log(`Offer SDP (audio):`, offer.sdp?.includes('audio') ? '✅ Has audio' : '❌ No audio')
     
     // Create peer connection if it doesn't exist (we're the answerer)
     if (!peerConnectionsRef.current.has(senderSocketId)) {
@@ -776,10 +861,20 @@ function VideoCallContent() {
         await peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
         console.log(`Set remote description for ${senderSocketId}`)
         
-        // Create and send answer
-        const answer = await peerConnection.createAnswer()
+        // Verify we have tracks to send
+        const senders = peerConnection.getSenders()
+        console.log(`Answer senders for ${senderSocketId}:`, senders.map(s => ({
+          track: s.track ? { kind: s.track.kind, enabled: s.track.enabled, readyState: s.track.readyState } : null
+        })))
+        
+        // Create and send answer with audio/video
+        const answer = await peerConnection.createAnswer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: true
+        })
         await peerConnection.setLocalDescription(answer)
         console.log(`Created answer for ${senderSocketId}`)
+        console.log(`Answer SDP (audio):`, answer.sdp?.includes('audio') ? '✅ Has audio' : '❌ No audio')
         
         if (socketRef.current) {
           socketRef.current.emit('answer', {
@@ -876,6 +971,10 @@ function VideoCallContent() {
           const audioStream = await navigator.mediaDevices.getUserMedia({
             video: false,
             audio: true,
+          })
+          // Mute audio tracks by default
+          audioStream.getAudioTracks().forEach(track => {
+            track.enabled = false
           })
           localStreamRef.current = audioStream
         }
@@ -1227,7 +1326,27 @@ function VideoCallContent() {
                   className="w-full h-full object-cover"
                   ref={(videoElement) => {
                     if (videoElement && participant.stream) {
-                      videoElement.srcObject = participant.stream
+                      // Ensure audio is enabled
+                      if (videoElement.srcObject !== participant.stream) {
+                        videoElement.srcObject = participant.stream
+                        console.log(`Setting remote video srcObject for ${participant.name}`)
+                      }
+                      
+                      // Ensure audio is not muted
+                      if (videoElement.muted) {
+                        console.log(`Unmuting remote video for ${participant.name}`)
+                        videoElement.muted = false
+                      }
+                      
+                      // Force play to ensure audio works (browser autoplay policy)
+                      videoElement.play().catch(err => {
+                        console.error(`Error playing remote video for ${participant.name}:`, err)
+                      })
+                      
+                      // Log audio track status
+                      participant.stream.getAudioTracks().forEach(track => {
+                        console.log(`Remote audio track for ${participant.name}: enabled=${track.enabled}, readyState=${track.readyState}`)
+                      })
                     }
                   }}
                 />
