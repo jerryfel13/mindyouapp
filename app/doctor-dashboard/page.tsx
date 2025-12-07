@@ -45,17 +45,39 @@ function DoctorDashboardContent() {
   }, [userId, filterStatus, showUpcoming])
 
   const fetchAppointments = async () => {
-    if (!userId) return
+    if (!userId) {
+      console.log('No userId found')
+      setLoadingAppointments(false)
+      return
+    }
     
     try {
       setLoadingAppointments(true)
-      const filters: any = { upcoming: showUpcoming }
-      if (filterStatus) filters.status = filterStatus
+      const filters: any = {}
+      if (showUpcoming) {
+        filters.upcoming = true
+      }
+      if (filterStatus) {
+        filters.status = filterStatus
+      }
+      
       // Use doctor-user endpoint since doctors are in users table with role='doctor'
+      console.log('Fetching appointments for doctor userId:', userId, 'with filters:', filters)
       const response = await api.getDoctorUserAppointments(userId, filters)
-      setAppointments(response.data || [])
+      console.log('Appointments response:', response)
+      
+      // Handle different response formats
+      const appointmentsData = response.data || response || []
+      console.log('Appointments data:', appointmentsData)
+      setAppointments(Array.isArray(appointmentsData) ? appointmentsData : [])
     } catch (error) {
       console.error('Error fetching appointments:', error)
+      // Show error to user
+      if (error instanceof Error) {
+        console.error('Error details:', error.message)
+        alert(`Error loading appointments: ${error.message}`)
+      }
+      setAppointments([])
     } finally {
       setLoadingAppointments(false)
     }
@@ -209,7 +231,10 @@ function DoctorDashboardContent() {
 
         {/* Appointments List */}
         <div>
-          <h2 className="text-2xl font-bold text-foreground mb-6">Your Appointments</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-foreground">Your Appointments</h2>
+            <p className="text-sm text-muted-foreground">Doctor ID: {userId}</p>
+          </div>
 
           {loadingAppointments ? (
             <div className="flex items-center justify-center py-12">
