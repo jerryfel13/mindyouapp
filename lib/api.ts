@@ -3,11 +3,19 @@ import { getAuthHeader } from './auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
+// Normalize base URL - remove trailing slash if present
+const normalizeBaseUrl = (url: string): string => {
+  return url.endsWith('/') ? url.slice(0, -1) : url;
+};
+
 export const api = {
   baseUrl: API_BASE_URL,
-  
+   
   async request(endpoint: string, options: RequestInit = {}) {
-    const url = `${API_BASE_URL}${endpoint}`;
+    // Ensure endpoint starts with / and base URL doesn't end with /
+    const baseUrl = normalizeBaseUrl(API_BASE_URL);
+    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = `${baseUrl}${normalizedEndpoint}`;
     
     // Get auth header if token exists
     const authHeader = getAuthHeader();
