@@ -4,10 +4,12 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Heart, Calendar, Clock, Users, LogOut, Settings, CheckCircle, XCircle, Loader2, Video, Phone } from "lucide-react"
+import { NotificationBell } from "@/components/NotificationBell"
 import DoctorProtectedRoute from "@/components/doctor-protected-route"
 import { getUserData, clearAuth } from "@/lib/auth"
 import { useRouter } from "next/navigation"
 import { api } from "@/lib/api"
+import Link from "next/link"
 
 interface Appointment {
   id: string
@@ -156,6 +158,14 @@ function DoctorDashboardContent() {
           </div>
 
           <div className="flex items-center gap-4">
+            <NotificationBell />
+            <Link 
+              href="/settings"
+              className="p-2 hover:bg-muted rounded-lg transition-colors"
+              title="Settings"
+            >
+              <Settings className="w-5 h-5 text-foreground" />
+            </Link>
             <div className="flex items-center gap-3 pl-4 border-l border-border">
               <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold">
                 {userData?.full_name?.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase() || "D"}
