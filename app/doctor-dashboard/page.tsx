@@ -36,11 +36,15 @@ function DoctorDashboardContent() {
   const [filterStatus, setFilterStatus] = useState<string>('')
   const [showUpcoming, setShowUpcoming] = useState(true)
 
-  const userId = userData?.id
+  const userId = userData?.id || userData?.user_id
 
   useEffect(() => {
+    console.log('Doctor Dashboard - User Data:', userData)
+    console.log('Doctor Dashboard - User ID:', userId)
     if (userId) {
       fetchAppointments()
+    } else {
+      console.error('No userId found in userData:', userData)
     }
   }, [userId, filterStatus, showUpcoming])
 
@@ -63,12 +67,18 @@ function DoctorDashboardContent() {
       
       // Use doctor-user endpoint since doctors are in users table with role='doctor'
       console.log('Fetching appointments for doctor userId:', userId, 'with filters:', filters)
+      console.log('User data:', userData)
+      
       const response = await api.getDoctorUserAppointments(userId, filters)
-      console.log('Appointments response:', response)
+      console.log('Full appointments response:', response)
+      console.log('Response data:', response.data)
+      console.log('Response count:', response.count)
       
       // Handle different response formats
       const appointmentsData = response.data || response || []
-      console.log('Appointments data:', appointmentsData)
+      console.log('Appointments data after processing:', appointmentsData)
+      console.log('Number of appointments:', appointmentsData.length)
+      
       setAppointments(Array.isArray(appointmentsData) ? appointmentsData : [])
     } catch (error) {
       console.error('Error fetching appointments:', error)
@@ -140,6 +150,7 @@ function DoctorDashboardContent() {
   const stats = {
     totalAppointments: appointments.length,
     pendingAppointments: appointments.filter(a => a.status.toLowerCase() === 'pending').length,
+    scheduledAppointments: appointments.filter(a => a.status.toLowerCase() === 'scheduled').length,
     confirmedAppointments: appointments.filter(a => a.status.toLowerCase() === 'confirmed').length,
     completedAppointments: appointments.filter(a => a.status.toLowerCase() === 'completed').length
   }
@@ -183,7 +194,7 @@ function DoctorDashboardContent() {
         </div>
 
         {/* Stats */}
-        <div className="grid md:grid-cols-4 gap-4 mb-8">
+        <div className="grid md:grid-cols-5 gap-4 mb-8">
           <Card className="p-6 bg-primary/10">
             <p className="text-sm text-muted-foreground mb-2">Total Appointments</p>
             <p className="text-3xl font-bold text-foreground">{stats.totalAppointments}</p>
@@ -191,6 +202,10 @@ function DoctorDashboardContent() {
           <Card className="p-6 bg-yellow-500/10">
             <p className="text-sm text-muted-foreground mb-2">Pending</p>
             <p className="text-3xl font-bold text-foreground">{stats.pendingAppointments}</p>
+          </Card>
+          <Card className="p-6 bg-purple-500/10">
+            <p className="text-sm text-muted-foreground mb-2">Scheduled</p>
+            <p className="text-3xl font-bold text-foreground">{stats.scheduledAppointments}</p>
           </Card>
           <Card className="p-6 bg-green-500/10">
             <p className="text-sm text-muted-foreground mb-2">Confirmed</p>
@@ -222,6 +237,7 @@ function DoctorDashboardContent() {
             className="px-4 py-2 rounded-lg border border-input bg-background text-foreground"
           >
             <option value="">All Statuses</option>
+            <option value="scheduled">Scheduled</option>
             <option value="pending">Pending</option>
             <option value="confirmed">Confirmed</option>
             <option value="completed">Completed</option>
@@ -283,7 +299,7 @@ function DoctorDashboardContent() {
                   )}
 
                   <div className="flex gap-2">
-                    {appointment.status.toLowerCase() === 'pending' && (
+                    {(appointment.status.toLowerCase() === 'scheduled' || appointment.status.toLowerCase() === 'pending') && (
                       <>
                         <Button
                           size="sm"
