@@ -879,22 +879,22 @@ function BookAppointmentPageContent() {
                   </p>
                 </div>
 
-                {/* Initialize Payment Button */}
+                {/* Confirm Payment Button */}
                 <Button
                   onClick={initializePayment}
-                  disabled={processingPayment || !selectedDoctor?.consultation_fee}
+                  disabled={processingPayment || !selectedDoctor?.consultation_fee || !cpNumber || !!cpNumberError}
                   className="w-full bg-primary hover:bg-primary/90"
                   size="lg"
                 >
                   {processingPayment ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Initializing Payment...
+                      Confirming...
                     </>
                   ) : (
                     <>
-                      <DollarSign className="w-4 h-4 mr-2" />
-                      Initialize Payment with {paymentMethod === 'gcash' ? 'GCash' : 'PayMaya'}
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Confirm
                     </>
                   )}
                 </Button>
