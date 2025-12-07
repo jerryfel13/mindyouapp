@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -1014,7 +1014,16 @@ function VideoCallContent() {
 export default function VideoCallPage() {
   return (
     <ProtectedRoute>
-      <VideoCallContent />
+      <Suspense fallback={
+        <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center p-4">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
+            <p className="text-foreground text-lg">Loading...</p>
+          </div>
+        </div>
+      }>
+        <VideoCallContent />
+      </Suspense>
     </ProtectedRoute>
   )
 }

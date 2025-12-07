@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -30,7 +30,7 @@ interface Appointment {
   }
 }
 
-export default function ConfirmationPage() {
+function ConfirmationPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const appointmentId = searchParams.get("id")
@@ -225,5 +225,20 @@ export default function ConfirmationPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function ConfirmationPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center">
+        <Card className="p-12 text-center">
+          <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading appointment details...</p>
+        </Card>
+      </div>
+    }>
+      <ConfirmationPageContent />
+    </Suspense>
   )
 }
