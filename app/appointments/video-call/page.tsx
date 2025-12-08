@@ -65,6 +65,11 @@ function VideoCallContent() {
   const userRole = userData?.role || 'user'
   const isDoctor = userRole === 'doctor' || userRole === 'admin'
 
+  // Debug: Log state changes to help diagnose stuck waiting screen
+  useEffect(() => {
+    console.log('🔄 State update - callStarted:', callStarted, 'waitingForDoctor:', waitingForDoctor, 'isDoctor:', isDoctor, 'participants:', participants.length)
+  }, [callStarted, waitingForDoctor, isDoctor, participants.length])
+
   // Initialize Socket.io connection
   useEffect(() => {
     const socket = io(API_BASE_URL, {
@@ -143,8 +148,22 @@ function VideoCallContent() {
     // Listen for call started event (broadcast to all users when doctor starts)
     socket.on('call-started', (data: { startedBy: string; startedByName: string }) => {
       console.log('🎬 Call started event received from:', data.startedByName)
-      setCallStarted(true)
-      setWaitingForDoctor(false)
+      console.log('🎬 Updating call state - setting callStarted=true, waitingForDoctor=false')
+      
+      // CRITICAL: Update state immediately to exit waiting screen
+      // Use functional updates to ensure we're working with latest state
+      setCallStarted(prev => {
+        if (!prev) {
+          console.log('🎬 Setting callStarted from false to true')
+        }
+        return true
+      })
+      setWaitingForDoctor(prev => {
+        if (prev) {
+          console.log('🎬 Setting waitingForDoctor from true to false')
+        }
+        return false
+      })
       
       // Initialize local stream when call starts
       const initializeLocalStream = async () => {
@@ -163,12 +182,15 @@ function VideoCallContent() {
                 setupAudioAnalyser(stream, 'local')
               }, 200)
             }
+          } else {
+            console.log('🎬 Local stream already exists')
           }
         } catch (error) {
           console.error("❌ Error accessing media devices:", error)
         }
       }
       
+      // Initialize stream immediately
       setTimeout(() => {
         initializeLocalStream()
       }, 300)
@@ -190,7 +212,23 @@ function VideoCallContent() {
     })
 
     socket.on('room-users', (users: Array<{ socketId: string; userId: string; userName: string }>) => {
-      console.log('Users in room:', users)
+      console.log('👥 Users in room:', users)
+      
+      // CRITICAL: If we receive room-users, it means the call is active
+      // ALWAYS update state to exit waiting screen - use functional updates to ensure latest state
+      console.log('👥 Call is active (room-users received), forcing state update to exit waiting screen...')
+      setCallStarted(prev => {
+        if (!prev) {
+          console.log('👥 Setting callStarted from false to true')
+        }
+        return true
+      })
+      setWaitingForDoctor(prev => {
+        if (prev) {
+          console.log('👥 Setting waitingForDoctor from true to false')
+        }
+        return false
+      })
       
       // Initialize connections with existing users
       // Wait for local stream to be ready before creating peer connections
@@ -206,11 +244,37 @@ function VideoCallContent() {
           users.forEach(user => {
             // Only create connection if it doesn't exist
             if (!peerConnectionsRef.current.has(user.socketId)) {
+              console.log(`👥 Creating peer connection with ${user.userName} (${user.socketId})`)
               createPeerConnection(user.socketId, user.userId, user.userName, true)
             }
           })
         } else {
-          console.warn('Local stream not ready, will retry when stream is available')
+          console.warn('⚠️ Local stream not ready, initializing now...')
+          // Try to initialize stream if it doesn't exist
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: false,
+              audio: true,
+            })
+            localStreamRef.current = stream
+            console.log('✅ Local stream initialized after room-users')
+            
+            if (stream.getAudioTracks().length > 0) {
+              setTimeout(() => {
+                setupAudioAnalyser(stream, 'local')
+              }, 200)
+            }
+            
+            // Now create connections
+            users.forEach(user => {
+              if (!peerConnectionsRef.current.has(user.socketId)) {
+                console.log(`👥 Creating peer connection with ${user.userName} (${user.socketId})`)
+                createPeerConnection(user.socketId, user.userId, user.userName, true)
+              }
+            })
+          } catch (error) {
+            console.error('❌ Error initializing stream:', error)
+          }
         }
       }
       
@@ -253,10 +317,31 @@ function VideoCallContent() {
       updateParticipantStatus(data.userId, { isVideoOff: data.isVideoOff })
     })
 
+    // Listen for socket errors
+    socket.on('error', (data: { message: string }) => {
+      console.error('❌ Socket error:', data.message)
+      alert(`Connection error: ${data.message}`)
+    })
+
+    // Listen for connection errors
+    socket.on('connect_error', (error) => {
+      console.error('❌ Socket connection error:', error)
+      setIsConnecting(false)
+    })
+
+    // Listen for disconnection
+    socket.on('disconnect', (reason) => {
+      console.warn('⚠️ Socket disconnected:', reason)
+      if (reason === 'io server disconnect') {
+        // Server disconnected, try to reconnect
+        socket.connect()
+      }
+    })
+
     return () => {
       socket.disconnect()
     }
-  }, [appointmentId, userId, userName])
+  }, [appointmentId, userId, userName, userRole, isDoctor])
 
   // Initialize local audio stream (video off by default)
   useEffect(() => {
@@ -988,7 +1073,9 @@ function VideoCallContent() {
   }
 
   // Show waiting screen for patients if call hasn't started
-  if (!callStarted && !isDoctor) {
+  // Also check waitingForDoctor state explicitly to ensure proper state management
+  if ((!callStarted || waitingForDoctor) && !isDoctor) {
+    console.log('👀 Rendering waiting screen - callStarted:', callStarted, 'waitingForDoctor:', waitingForDoctor, 'isDoctor:', isDoctor)
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center p-4">
         <Card className="w-full max-w-md p-8 text-center">
@@ -1000,6 +1087,9 @@ function VideoCallContent() {
             </p>
             <p className="text-xs text-muted-foreground mt-2">
               Check browser console (F12) for connection status
+            </p>
+            <p className="text-xs text-muted-foreground mt-1 font-mono">
+              Debug: callStarted={callStarted ? 'true' : 'false'}, waiting={waitingForDoctor ? 'true' : 'false'}
             </p>
           </div>
           <div className="flex items-center justify-center gap-2 mb-6">
