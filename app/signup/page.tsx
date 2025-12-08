@@ -227,18 +227,7 @@ export default function SignupPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Age <span className="text-red-500">*</span>
-              </label>
-              <input
-                name="age"
-                type="number"
-                value={formData.age}
-                onChange={handleChange}
-                className="w-full px-4 py-2 rounded-lg border"
-              />
-            </div>
+            
 
             <div>
               <label className="block text-sm font-medium mb-2">
@@ -288,33 +277,37 @@ export default function SignupPage() {
                 className="w-full px-4 py-2 rounded-lg border"
               />
             </div>
+            
 
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Contact Number <span className="text-red-500">*</span>
-              </label>
-              <input
-                name="contactNumber"
-                type="text"
-                value={formData.contactNumber}
-                onChange={handleChange}
-                className="w-full px-4 py-2 rounded-lg border"
-              />
-            </div>
+                <label className="block text-sm font-medium mb-2">
+                  Contact Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  name="contactNumber"
+                  type="number"
+                  value={formData.contactNumber}
+                    onChange={handleChange}
+                    placeholder="09XXXXXXXXX"
+                    maxLength={11}
+                    className="w-full px-4 py-2 rounded-lg border"
+                  />
+                </div>
 
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Email Address <span className="text-red-500">*</span>
-              </label>
-              <input
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full px-4 py-2 rounded-lg border"
-              />
-            </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    name="email"
+                    type="text"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="example@mail.com"
+                    className="w-full px-4 py-2 rounded-lg border"
+                  />
+                </div>
+
 
             {/* Emergency Contact */}
             <div>
