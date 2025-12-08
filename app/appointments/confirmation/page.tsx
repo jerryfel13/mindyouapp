@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Heart, Calendar, Clock, CheckCircle, Mail, Loader2 } from "lucide-react"
+import { Heart, Calendar, Clock, CheckCircle, Mail, Loader2, CreditCard, DollarSign, Download } from "lucide-react"
 import { api } from "@/lib/api"
 import { getUserData } from "@/lib/auth"
 
@@ -39,6 +39,9 @@ function ConfirmationPageContent() {
   const [appointment, setAppointment] = useState<Appointment | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [payment, setPayment] = useState<any>(null)
+  const [loadingPayment, setLoadingPayment] = useState(false)
+  const [doctorFee, setDoctorFee] = useState<number | null>(null)
 
   useEffect(() => {
     const fetchAppointment = async () => {
@@ -52,6 +55,30 @@ function ConfirmationPageContent() {
         setLoading(true)
         const response = await api.getAppointmentById(appointmentId)
         setAppointment(response.data)
+        
+        // Fetch doctor info to get consultation fee
+        if (response.data?.doctor_id) {
+          try {
+            const doctorResponse = await api.getDoctorsFromUsers({ is_active: true })
+            const doctor = doctorResponse.data?.find((d: any) => d.id === response.data.doctor_id)
+            if (doctor?.consultation_fee) {
+              setDoctorFee(doctor.consultation_fee)
+            }
+          } catch (err) {
+            console.error('Error fetching doctor info:', err)
+          }
+        }
+        
+        // Check if payment already exists
+        try {
+          const paymentResponse = await api.getPaymentByAppointmentId(appointmentId)
+          if (paymentResponse.data) {
+            setPayment(paymentResponse.data)
+          }
+        } catch (err) {
+          // Payment doesn't exist yet, which is fine
+          console.log('No payment found for this appointment')
+        }
       } catch (err) {
         console.error('Error fetching appointment:', err)
         setError(err instanceof Error ? err.message : 'Failed to load appointment details')
@@ -62,6 +89,42 @@ function ConfirmationPageContent() {
 
     fetchAppointment()
   }, [appointmentId])
+
+  const handlePayment = async () => {
+    if (!appointment || !doctorFee) return
+    
+    setLoadingPayment(true)
+    try {
+      // In a real implementation, this would integrate with a payment gateway
+      // For now, we'll simulate a payment creation
+      // You would typically redirect to Stripe Checkout or similar here
+      
+      // Example: Create payment record (after successful payment processing)
+      const paymentData = {
+        appointment_id: appointment.id,
+        amount: doctorFee,
+        currency: 'PHP',
+        payment_method: 'gcash', // GCash or PayMaya only
+        transaction_id: `txn_${Date.now()}`,
+        payment_intent_id: `pi_${Date.now()}`,
+        receipt_url: `https://example.com/receipts/${appointment.id}`,
+        metadata: {
+          appointment_type: appointment.appointment_type,
+          duration_minutes: appointment.duration_minutes
+        }
+      }
+      
+      const response = await api.createPaymentFromPatient(paymentData)
+      setPayment(response.data)
+      
+      alert('Payment processed successfully!')
+    } catch (err) {
+      console.error('Error processing payment:', err)
+      alert(err instanceof Error ? err.message : 'Failed to process payment')
+    } finally {
+      setLoadingPayment(false)
+    }
+  }
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -181,6 +244,82 @@ function ConfirmationPageContent() {
             </div>
           </div>
         </Card>
+
+        {/* Payment Section */}
+        {doctorFee && (
+          <Card className="p-8 mb-8 border-primary/20">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-semibold text-foreground mb-2">Payment</h2>
+                <p className="text-muted-foreground">Complete payment for your appointment</p>
+              </div>
+              <DollarSign className="w-8 h-8 text-primary" />
+            </div>
+            
+            {payment ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle className="w-6 h-6 text-green-500" />
+                    <div>
+                      <p className="font-semibold text-foreground">Payment Completed</p>
+                      <p className="text-sm text-muted-foreground">
+                        ₱{parseFloat(payment.amount).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-500/20 text-green-500">
+                    {payment.payment_status}
+                  </span>
+                </div>
+                {payment.receipt_url && (
+                  <a
+                    href={payment.receipt_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-primary hover:underline"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download Receipt
+                  </a>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Consultation Fee</p>
+                    <p className="text-2xl font-bold text-foreground">
+                      ₱{parseFloat(doctorFee).toFixed(2)}
+                    </p>
+                  </div>
+                  <CreditCard className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <Button
+                  onClick={handlePayment}
+                  disabled={loadingPayment}
+                  className="w-full bg-primary hover:bg-primary/90"
+                  size="lg"
+                >
+                  {loadingPayment ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing Payment...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Pay Now
+                    </>
+                  )}
+                </Button>
+                <p className="text-xs text-center text-muted-foreground">
+                  Secure payment powered by Stripe
+                </p>
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* Next Steps */}
         <Card className="p-8 bg-accent/5 border-accent/20 mb-8">

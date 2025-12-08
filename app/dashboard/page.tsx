@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Heart, Calendar, Clock, MapPin, LogOut, Settings, Bell, ChevronRight, Users, Loader2 } from "lucide-react"
+import { Heart, Calendar, Clock, MapPin, LogOut, Settings, Bell, ChevronRight, Users, Loader2, DollarSign } from "lucide-react"
+import { NotificationBell } from "@/components/NotificationBell"
 import ProtectedRoute from "@/components/protected-route"
 import { getUserData, clearAuth } from "@/lib/auth"
 import { useRouter } from "next/navigation"
@@ -163,12 +164,12 @@ function DashboardContent() {
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="p-2 hover:bg-muted rounded-lg transition-colors">
-              <Bell className="w-5 h-5 text-foreground" />
-            </button>
-            <button className="p-2 hover:bg-muted rounded-lg transition-colors">
-              <Settings className="w-5 h-5 text-foreground" />
-            </button>
+            <NotificationBell />
+            <Link href="/settings">
+              <button className="p-2 hover:bg-muted rounded-lg transition-colors">
+                <Settings className="w-5 h-5 text-foreground" />
+              </button>
+            </Link>
             <div className="flex items-center gap-3 pl-4 border-l border-border">
               <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold">
                 {user.avatar}
@@ -203,6 +204,21 @@ function DashboardContent() {
               <p className="text-3xl font-bold text-foreground">{stat.value}</p>
             </Card>
           ))}
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mb-8">
+          <Link href="/payments">
+            <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20 hover:shadow-lg transition-all cursor-pointer">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">Payment History</h3>
+                  <p className="text-sm text-muted-foreground">View your payment history and receipts</p>
+                </div>
+                <DollarSign className="w-12 h-12 text-primary" />
+              </div>
+            </Card>
+          </Link>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">

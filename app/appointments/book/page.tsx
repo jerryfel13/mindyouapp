@@ -35,6 +35,7 @@ function BookAppointmentPageContent() {
   const [loading, setLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [appointmentId, setAppointmentId] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchDoctors = async () => {
@@ -138,15 +139,20 @@ function BookAppointmentPageContent() {
       }
 
       const response = await api.createAppointment(appointmentData)
+      setAppointmentId(response.data.id)
       
-      // Redirect to confirmation page with appointment ID
+      // Redirect to confirmation page
       router.push(`/appointments/confirmation?id=${response.data.id}`)
     } catch (err) {
       console.error('Error creating appointment:', err)
       setError(err instanceof Error ? err.message : 'Failed to create appointment. Please try again.')
+    } finally {
       setIsCreating(false)
     }
   }
+
+
+  const selectedDoctor = doctors.find((d) => d.id === selectedTherapist)
 
   const calendarDays = generateCalendarDays()
   const monthName = currentMonth.toLocaleString("default", { month: "long", year: "numeric" })
@@ -366,6 +372,7 @@ function BookAppointmentPageContent() {
           </Card>
         )}
 
+
         <div className="flex gap-4">
           {step > 1 && (
             <Button variant="outline" onClick={() => setStep(step - 1)} className="bg-transparent">
@@ -396,7 +403,10 @@ function BookAppointmentPageContent() {
                   Creating Appointment...
                 </>
               ) : (
-                'Confirm Booking'
+                <>
+                  Confirm Booking
+                  <ChevronRight className="w-4 h-4 ml-2" />
+                </>
               )}
             </Button>
           )}

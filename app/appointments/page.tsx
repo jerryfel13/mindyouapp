@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Heart, Calendar, Clock, MapPin, X, Users, Loader2, CheckCircle } from "lucide-react"
+import { Heart, Calendar, Clock, MapPin, X, Users, Loader2, CheckCircle, CreditCard, DollarSign } from "lucide-react"
 import { useState, useEffect } from "react"
 import { api } from "@/lib/api"
 import { getUserData } from "@/lib/auth"
@@ -50,6 +50,7 @@ export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [pastAppointments, setPastAppointments] = useState<Appointment[]>([])
   const [loadingAppointments, setLoadingAppointments] = useState(true)
+  const [paymentsMap, setPaymentsMap] = useState<Record<string, any>>({})
   
   useEffect(() => {
     const fetchAvailableDoctors = async () => {
@@ -116,6 +117,23 @@ export default function AppointmentsPage() {
         
         setAppointments(upcomingAppointments)
         setPastAppointments(past)
+        
+        // Fetch payments for all appointments
+        const allAppointmentIds = [...upcomingAppointments, ...past].map(apt => apt.id)
+        const payments: Record<string, any> = {}
+        
+        for (const aptId of allAppointmentIds) {
+          try {
+            const paymentResponse = await api.getPaymentByAppointmentId(aptId)
+            if (paymentResponse.data) {
+              payments[aptId] = paymentResponse.data
+            }
+          } catch (err) {
+            // No payment found, which is fine
+          }
+        }
+        
+        setPaymentsMap(payments)
       } catch (error) {
         console.error('Error fetching appointments:', error)
       } finally {
@@ -232,6 +250,44 @@ export default function AppointmentsPage() {
                       {appointment.duration_minutes || 60} min
                     </div>
                   </div>
+
+                  {/* Payment Status */}
+                  {paymentsMap[appointment.id] ? (
+                    <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Payment Completed</p>
+                          <p className="text-xs text-muted-foreground">
+                            ₱{parseFloat(paymentsMap[appointment.id].amount).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                      <Link href="/payments">
+                        <Button variant="ghost" size="sm">
+                          View Receipt
+                        </Button>
+                      </Link>
+                    </div>
+                  ) : appointment.doctor?.consultation_fee && (
+                    <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="w-5 h-5 text-yellow-500" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Payment Pending</p>
+                          <p className="text-xs text-muted-foreground">
+                            ₱{parseFloat(appointment.doctor.consultation_fee).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                      <Link href={`/appointments/confirmation?id=${appointment.id}`}>
+                        <Button variant="outline" size="sm">
+                          <CreditCard className="w-4 h-4 mr-1" />
+                          Pay Now
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
 
                   <div className="flex gap-3">
                     {appointment.appointment_type === 'Video Call' && (
