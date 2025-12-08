@@ -55,3 +55,4 @@ export default function DoctorProtectedRoute({ children }: DoctorProtectedRouteP
   return <>{children}</>
 }
 
+

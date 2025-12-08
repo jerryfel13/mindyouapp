@@ -649,6 +649,26 @@ function VideoCallContent() {
     }
   }, [participants.length]) // Re-run when participants change
 
+  // Update video elements when participant streams change
+  useEffect(() => {
+    // Force re-render when participants change to update video elements
+    const videoElements = document.querySelectorAll('video[data-remote="true"]')
+    videoElements.forEach((videoEl) => {
+      const video = videoEl as HTMLVideoElement
+      if (video.srcObject) {
+        const stream = video.srcObject as MediaStream
+        // Ensure video tracks are enabled
+        stream.getVideoTracks().forEach(track => {
+          if (!track.enabled) {
+            track.enabled = true
+          }
+        })
+        // Force play
+        video.play().catch(err => console.error('Error playing video:', err))
+      }
+    })
+  }, [participants])
+
   const createPeerConnection = async (targetSocketId: string, targetUserId: string, targetUserName: string, isInitiator: boolean) => {
     // Wait for local stream if not available
     if (!localStreamRef.current) {
@@ -724,6 +744,15 @@ function VideoCallContent() {
         }
       })
       
+      // Ensure video tracks are enabled
+      remoteStream.getVideoTracks().forEach(track => {
+        console.log(`Remote video track: enabled=${track.enabled}, readyState=${track.readyState}, muted=${track.muted}`)
+        if (!track.enabled) {
+          console.warn(`⚠️ Remote video track is disabled, enabling it...`)
+          track.enabled = true
+        }
+      })
+      
       // Setup audio analyser for voice detection immediately
       if (remoteStream.getAudioTracks().length > 0) {
         const audioTrack = remoteStream.getAudioTracks()[0]
@@ -745,6 +774,10 @@ function VideoCallContent() {
       }
       
       // Update participant with stream
+      // Check if video is actually available and enabled
+      const hasVideo = remoteStream.getVideoTracks().length > 0 && 
+        remoteStream.getVideoTracks().some(track => track.enabled && track.readyState === 'live')
+      
       setParticipants(prev => {
         const existing = prev.find(p => p.socketId === targetSocketId)
         if (existing) {
@@ -754,7 +787,7 @@ function VideoCallContent() {
                   ...p, 
                   stream: remoteStream, 
                   isSpeaking: false,
-                  isVideoOff: remoteStream.getVideoTracks().length === 0 || !remoteStream.getVideoTracks()[0].enabled
+                  isVideoOff: !hasVideo
                 }
               : p
           )
@@ -765,12 +798,33 @@ function VideoCallContent() {
             name: targetUserName,
             isLocal: false,
             isMuted: remoteStream.getAudioTracks().length === 0 || !remoteStream.getAudioTracks()[0].enabled,
-            isVideoOff: remoteStream.getVideoTracks().length === 0 || !remoteStream.getVideoTracks()[0].enabled,
+            isVideoOff: !hasVideo,
             isSpeaking: false,
             stream: remoteStream,
             peerConnection
           }]
         }
+      })
+      
+      // Listen for track changes to update video status
+      remoteStream.getVideoTracks().forEach(track => {
+        track.addEventListener('enabled', () => {
+          console.log(`Video track enabled for ${targetUserName}`)
+          setParticipants(prev => prev.map(p => 
+            p.socketId === targetSocketId 
+              ? { ...p, isVideoOff: !track.enabled }
+              : p
+          ))
+        })
+        
+        track.addEventListener('disabled', () => {
+          console.log(`Video track disabled for ${targetUserName}`)
+          setParticipants(prev => prev.map(p => 
+            p.socketId === targetSocketId 
+              ? { ...p, isVideoOff: true }
+              : p
+          ))
+        })
       })
       
       // Force re-render by updating state
@@ -1321,12 +1375,13 @@ function VideoCallContent() {
                 />
               ) : (
                 <video
+                  data-remote="true"
                   autoPlay
                   playsInline
                   className="w-full h-full object-cover"
                   ref={(videoElement) => {
                     if (videoElement && participant.stream) {
-                      // Ensure audio is enabled
+                      // Always set srcObject to ensure it's updated when stream changes
                       if (videoElement.srcObject !== participant.stream) {
                         videoElement.srcObject = participant.stream
                         console.log(`Setting remote video srcObject for ${participant.name}`)
@@ -1338,14 +1393,32 @@ function VideoCallContent() {
                         videoElement.muted = false
                       }
                       
-                      // Force play to ensure audio works (browser autoplay policy)
+                      // Ensure video tracks are enabled
+                      participant.stream.getVideoTracks().forEach(track => {
+                        if (!track.enabled) {
+                          console.log(`Enabling remote video track for ${participant.name}`)
+                          track.enabled = true
+                        }
+                      })
+                      
+                      // Force play to ensure video/audio works (browser autoplay policy)
                       videoElement.play().catch(err => {
                         console.error(`Error playing remote video for ${participant.name}:`, err)
                       })
                       
-                      // Log audio track status
-                      participant.stream.getAudioTracks().forEach(track => {
-                        console.log(`Remote audio track for ${participant.name}: enabled=${track.enabled}, readyState=${track.readyState}`)
+                      // Log track status
+                      participant.stream.getTracks().forEach(track => {
+                        console.log(`Remote ${track.kind} track for ${participant.name}: enabled=${track.enabled}, readyState=${track.readyState}`)
+                      })
+                      
+                      // Listen for new tracks being added to the stream
+                      participant.stream.addEventListener('addtrack', (event) => {
+                        console.log(`New ${event.track.kind} track added to remote stream for ${participant.name}`)
+                        if (event.track.kind === 'video') {
+                          event.track.enabled = true
+                          // Force re-render to show video
+                          setParticipants(prev => [...prev])
+                        }
                       })
                     }
                   }}
@@ -1353,15 +1426,23 @@ function VideoCallContent() {
               )}
               
               {/* Video Off Placeholder */}
-              {(participant.isVideoOff || (!participant.isLocal && !participant.stream)) && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-                  <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center">
-                    <span className="text-3xl font-semibold text-primary">
-                      {participant.name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
-                    </span>
+              {(() => {
+                // Check if video is actually off
+                const hasVideo = participant.stream && 
+                  participant.stream.getVideoTracks().length > 0 && 
+                  participant.stream.getVideoTracks().some(track => track.enabled && track.readyState === 'live')
+                const showPlaceholder = participant.isVideoOff || (!participant.isLocal && !hasVideo)
+                
+                return showPlaceholder ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-800 z-10">
+                    <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center">
+                      <span className="text-3xl font-semibold text-primary">
+                        {participant.name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              )}
+                ) : null
+              })()}
               
               {/* Participant Info Overlay */}
               <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg">
