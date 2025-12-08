@@ -313,26 +313,30 @@ function DoctorDashboardContent() {
                         </Button>
                       </>
                     )}
-                    {appointment.status.toLowerCase() === 'confirmed' && (
-                      <>
-                        {appointment.appointment_type === 'Video Call' && appointment.meeting_room_id && (
-                          <Button
-                            size="sm"
-                            className="bg-primary hover:bg-primary/90"
-                            onClick={() => router.push(`/appointments/video-call?id=${appointment.meeting_room_id || appointment.id}`)}
-                          >
-                            <Video className="w-4 h-4 mr-1" />
-                            Join Session
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleUpdateAppointmentStatus(appointment.id, 'completed')}
-                        >
-                          Mark Complete
-                        </Button>
-                      </>
+                    {/* Show Join Session button for any status except completed/cancelled */}
+                    {/* Allow joining Video Call appointments (or default to Video Call if type not set) */}
+                    {appointment.status.toLowerCase() !== 'completed' && 
+                     appointment.status.toLowerCase() !== 'cancelled' && 
+                     (appointment.appointment_type === 'Video Call' || !appointment.appointment_type) && (
+                      <Button
+                        size="sm"
+                        className="bg-primary hover:bg-primary/90"
+                        onClick={() => router.push(`/appointments/video-call?id=${appointment.meeting_room_id || appointment.id}`)}
+                      >
+                        <Video className="w-4 h-4 mr-1" />
+                        Join Session
+                      </Button>
+                    )}
+                    {/* Show Mark Complete button for confirmed or scheduled appointments */}
+                    {(appointment.status.toLowerCase() === 'confirmed' || 
+                      appointment.status.toLowerCase() === 'scheduled') && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleUpdateAppointmentStatus(appointment.id, 'completed')}
+                      >
+                        Mark Complete
+                      </Button>
                     )}
                   </div>
                 </Card>
