@@ -215,8 +215,7 @@ function DashboardContent() {
                   <h3 className="text-lg font-semibold text-foreground mb-2">Payment History</h3>
                   <p className="text-sm text-muted-foreground">View your payment history and receipts</p>
                 </div>
-
-                <span className="text-primary font-bold text-xl">₱</span>
+              <span className="text-primary font-bold text-xl">₱</span>
               </div>
             </Card>
           </Link>
