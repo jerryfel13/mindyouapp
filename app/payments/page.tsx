@@ -4,8 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { 
-  Heart, 
-  DollarSign, 
+  Heart,  
   TrendingUp, 
   Calendar, 
   CreditCard, 
@@ -122,8 +121,7 @@ function PaymentsContent() {
   }
 
   const formatCurrency = (amount: number, currency: string = 'PHP') => {
-    // Always format as PHP (Philippine Peso)
-    return `₱${parseFloat(amount).toFixed(2)}`
+    return `₱{parseFloat(amount).toFixed(2)}`
   }
 
   const formatDate = (dateString: string) => {
@@ -168,7 +166,7 @@ function PaymentsContent() {
       case 'debit_card':
         return <CreditCard className="w-4 h-4" />
       default:
-        return <DollarSign className="w-4 h-4" />
+        return null  // removed DollarSign icon completely
     }
   }
 
@@ -212,6 +210,8 @@ function PaymentsContent() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+
         {/* Stats Cards */}
         {loadingStats ? (
           <div className="grid md:grid-cols-4 gap-4 mb-8">
@@ -223,10 +223,12 @@ function PaymentsContent() {
           </div>
         ) : stats && (
           <div className="grid md:grid-cols-4 gap-4 mb-8">
+
+            {/* Total Paid */}
             <Card className="p-6 bg-primary/10 border-primary/20">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm text-muted-foreground">Total Paid</p>
-                <DollarSign className="w-5 h-5 text-primary" />
+                <span className="text-primary font-bold text-xl">₱</span>
               </div>
               <p className="text-3xl font-bold text-foreground">
                 {formatCurrency(stats.total_paid)}
@@ -482,4 +484,3 @@ export default function PaymentsPage() {
     </ProtectedRoute>
   )
 }
-
